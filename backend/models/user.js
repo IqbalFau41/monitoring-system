@@ -1,5 +1,4 @@
 //backend/models/user.js
-const sql = require("mssql");
 const jwt = require("jsonwebtoken");
 const Joi = require("joi");
 
@@ -11,14 +10,14 @@ const generateAuthToken = (userId) => {
 // Fungsi untuk memvalidasi data login
 const validateLogin = (data) => {
   const schema = Joi.object({
-    nrp: Joi.string().required().label("NRP"), // Changed from 'nrp' to 'nrp'
+    nrp: Joi.string().required().label("NRP"),
     email: Joi.string().required().email().label("Email"),
   });
   return schema.validate(data);
 };
 
-// Fungsi login
-const login = async (data) => {
+// Fungsi login - Using the connection pool from database object
+const login = async (data, deptMfgPool) => {
   const { error } = validateLogin(data);
   if (error) throw new Error(error.details[0].message);
 
@@ -27,20 +26,31 @@ const login = async (data) => {
   const EMAIL = data.email.toLowerCase();
 
   try {
-    const result = await sql.query`
-      SELECT * FROM [DEPT_MANUFACTURING].[dbo].[USER_NAME] 
-      WHERE NRP = ${NRP} AND EMAIL = ${EMAIL}
-    `;
-    const user = result.recordset[0];
+    // Create a new request using the provided connection pool
+    const request = deptMfgPool.request();
 
+    // Add parameters - safer than string interpolation
+    request.input("nrp", NRP);
+    request.input("email", EMAIL);
+
+    // Execute query with parameters
+    const result = await request.query(`
+      SELECT * FROM [DEPT_MANUFACTURING].[dbo].[USER_NAME] 
+      WHERE NRP = @nrp AND EMAIL = @email
+    `);
+
+    const user = result.recordset[0];
     if (!user) throw new Error("User not found");
 
     // Update LastLogin timestamp
-    await sql.query`
+    const updateRequest = deptMfgPool.request();
+    updateRequest.input("nrp", NRP);
+
+    await updateRequest.query(`
       UPDATE [DEPT_MANUFACTURING].[dbo].[USER_NAME] 
       SET LastLogin = GETDATE() 
-      WHERE NRP = ${NRP}
-    `;
+      WHERE NRP = @nrp
+    `);
 
     const token = generateAuthToken(user.NRP);
     return { token, user };

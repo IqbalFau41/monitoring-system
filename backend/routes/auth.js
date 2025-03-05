@@ -5,7 +5,17 @@ const { login } = require("../models/user");
 // Rute untuk login
 router.post("/login", async (req, res) => {
   try {
-    const { token, user } = await login(req.body);
+    // Get the database connection pool from global.databases
+    const { deptMfg } = global.databases;
+
+    if (!deptMfg) {
+      console.error("Database connection not available for DEPT_MANUFACTURING");
+      return res.status(500).send({ message: "Database connection error" });
+    }
+
+    // Pass the connection pool to the login function
+    const { token, user } = await login(req.body, deptMfg);
+
     res.status(200).send({ token, message: "Logged in successfully", user });
   } catch (error) {
     console.error("Error during login:", error);

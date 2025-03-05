@@ -1,8 +1,13 @@
 //backend/models/inventory.js
+/**
+ * DATABASE: DEPT_MANUFACTURING (DB2)
+ * TABLE: inventory_parts
+ */
 const sql = require("mssql");
 
 // Fungsi untuk membuat item inventaris baru
 const createInventoryItem = async (data) => {
+  // Using DEPT_MANUFACTURING database (DB2)
   const {
     date_part,
     delivery_note,

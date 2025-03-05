@@ -1,11 +1,27 @@
-const sql = require("mssql");
+// models/joblist.js
 
 // Create new job list item
-const createJobListItem = async (data) => {
+const createJobListItem = async (data, deptMfgPool) => {
   const { NRP, NAME, JOB_CLASS, JOB_DESC, FACTORY, DUE_DATE, STATUS } = data;
 
   try {
-    await sql.query`
+    // Check if connection exists
+    if (!deptMfgPool) {
+      throw new Error("Database connection not available");
+    }
+
+    const request = deptMfgPool.request();
+
+    // Add parameters
+    request.input("nrp", NRP);
+    request.input("name", NAME);
+    request.input("job_class", JOB_CLASS || null);
+    request.input("job_desc", JOB_DESC || null);
+    request.input("factory", FACTORY || null);
+    request.input("due_date", DUE_DATE || null);
+    request.input("status", STATUS || null);
+
+    await request.query(`
       INSERT INTO [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] (
         NRP, 
         NAME, 
@@ -17,16 +33,17 @@ const createJobListItem = async (data) => {
         created_at,
         updated_at
       ) VALUES (
-        ${NRP}, 
-        ${NAME}, 
-        ${JOB_CLASS}, 
-        ${JOB_DESC}, 
-        ${FACTORY}, 
-        ${DUE_DATE}, 
-        ${STATUS},
+        @nrp, 
+        @name, 
+        @job_class, 
+        @job_desc, 
+        @factory, 
+        @due_date, 
+        @status,
         GETDATE(),
         GETDATE()
-      )`;
+      )`);
+
     return { message: "Job list item created successfully" };
   } catch (error) {
     console.error("Error creating job list item:", error.message);
@@ -35,9 +52,15 @@ const createJobListItem = async (data) => {
 };
 
 // Get all job list items
-const getJobListItems = async () => {
+const getJobListItems = async (deptMfgPool) => {
   try {
-    const result = await sql.query`
+    if (!deptMfgPool) {
+      throw new Error("Database connection not available");
+    }
+
+    const request = deptMfgPool.request();
+
+    const result = await request.query(`
       SELECT TOP (1000) 
         NRP,
         NAME,
@@ -50,7 +73,8 @@ const getJobListItems = async () => {
         updated_at
       FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] 
       ORDER BY created_at DESC
-    `;
+    `);
+
     return result.recordset;
   } catch (error) {
     console.error("Error fetching job list items:", error.message);
@@ -58,8 +82,44 @@ const getJobListItems = async () => {
   }
 };
 
+// Get job list item by NRP
+const getJobListItemByNRP = async (NRP, deptMfgPool) => {
+  try {
+    if (!deptMfgPool) {
+      throw new Error("Database connection not available");
+    }
+
+    const request = deptMfgPool.request();
+    request.input("nrp", NRP);
+
+    const result = await request.query(`
+      SELECT 
+        NRP,
+        NAME,
+        JOB_CLASS,
+        JOB_DESC,
+        FACTORY,
+        DUE_DATE,
+        STATUS,
+        created_at,
+        updated_at
+      FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] 
+      WHERE NRP = @nrp
+    `);
+
+    if (result.recordset.length === 0) {
+      throw new Error("Job list item not found");
+    }
+
+    return result.recordset[0];
+  } catch (error) {
+    console.error("Error fetching job list item:", error.message);
+    throw error;
+  }
+};
+
 // Update job list item
-const updateJobListItem = async (NRP, data) => {
+const updateJobListItem = async (NRP, data, deptMfgPool) => {
   const { NAME, JOB_CLASS, JOB_DESC, FACTORY, DUE_DATE, STATUS } = data;
 
   // Validation
@@ -67,25 +127,45 @@ const updateJobListItem = async (NRP, data) => {
     throw new Error("NRP and Name are required.");
   }
 
-  const checkItem = await sql.query`
-    SELECT * FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] WHERE NRP = ${NRP}
-  `;
-  if (checkItem.recordset.length === 0) {
-    throw new Error("Job list item not found");
-  }
-
   try {
-    await sql.query`
+    if (!deptMfgPool) {
+      throw new Error("Database connection not available");
+    }
+
+    // Check if item exists
+    const checkRequest = deptMfgPool.request();
+    checkRequest.input("nrp", NRP);
+
+    const checkResult = await checkRequest.query(`
+      SELECT * FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] WHERE NRP = @nrp
+    `);
+
+    if (checkResult.recordset.length === 0) {
+      throw new Error("Job list item not found");
+    }
+
+    // Update the item
+    const updateRequest = deptMfgPool.request();
+    updateRequest.input("nrp", NRP);
+    updateRequest.input("name", NAME);
+    updateRequest.input("job_class", JOB_CLASS || null);
+    updateRequest.input("job_desc", JOB_DESC || null);
+    updateRequest.input("factory", FACTORY || null);
+    updateRequest.input("due_date", DUE_DATE || null);
+    updateRequest.input("status", STATUS || null);
+
+    await updateRequest.query(`
       UPDATE [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] 
       SET 
-        NAME = ${NAME}, 
-        JOB_CLASS = ${JOB_CLASS}, 
-        JOB_DESC = ${JOB_DESC}, 
-        FACTORY = ${FACTORY}, 
-        DUE_DATE = ${DUE_DATE}, 
-        STATUS = ${STATUS},
+        NAME = @name, 
+        JOB_CLASS = @job_class, 
+        JOB_DESC = @job_desc, 
+        FACTORY = @factory, 
+        DUE_DATE = @due_date, 
+        STATUS = @status,
         updated_at = GETDATE()
-      WHERE NRP = ${NRP}`;
+      WHERE NRP = @nrp`);
+
     return { message: "Job list item updated successfully" };
   } catch (error) {
     console.error("Error updating job list item:", error.message);
@@ -94,18 +174,32 @@ const updateJobListItem = async (NRP, data) => {
 };
 
 // Delete job list item
-const deleteJobListItem = async (NRP) => {
-  const checkItem = await sql.query`
-    SELECT * FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] WHERE NRP = ${NRP}
-  `;
-  if (checkItem.recordset.length === 0) {
-    throw new Error("Job list item not found");
-  }
-
+const deleteJobListItem = async (NRP, deptMfgPool) => {
   try {
-    await sql.query`
-      DELETE FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] WHERE NRP = ${NRP}
-    `;
+    if (!deptMfgPool) {
+      throw new Error("Database connection not available");
+    }
+
+    // Check if item exists
+    const checkRequest = deptMfgPool.request();
+    checkRequest.input("nrp", NRP);
+
+    const checkResult = await checkRequest.query(`
+      SELECT * FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] WHERE NRP = @nrp
+    `);
+
+    if (checkResult.recordset.length === 0) {
+      throw new Error("Job list item not found");
+    }
+
+    // Delete the item
+    const deleteRequest = deptMfgPool.request();
+    deleteRequest.input("nrp", NRP);
+
+    await deleteRequest.query(`
+      DELETE FROM [DEPT_MANUFACTURING].[dbo].[USER_JOBLIST] WHERE NRP = @nrp
+    `);
+
     return { message: "Job list item deleted successfully" };
   } catch (error) {
     console.error("Error deleting job list item:", error.message);
@@ -116,6 +210,7 @@ const deleteJobListItem = async (NRP) => {
 module.exports = {
   createJobListItem,
   getJobListItems,
+  getJobListItemByNRP,
   updateJobListItem,
   deleteJobListItem,
 };

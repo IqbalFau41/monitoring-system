@@ -1,3 +1,4 @@
+// backend/index.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -7,51 +8,76 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+
+// Explicit CORS configuration
 app.use(
   cors({
-    origin: "*", // Allow access from any origin for development
+    origin: "*", // Allow all origins
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
 
 // Fungsi async untuk inisialisasi server
 const startServer = async () => {
   try {
-    // Sambungkan ke kedua database
+    // Sambungkan ke semua database
     const databases = await connectDatabases();
 
-    // Tambahkan database ke global atau gunakan dependency injection
+    // Tambahkan database ke global untuk diakses di seluruh aplikasi
     global.databases = databases;
 
-    // API routes
-    const userRouter = require("./routes/auth");
-    const inventoryRouter = require("./routes/inventory");
-    const jobListRouter = require("./routes/joblist");
-    const machineNameRouter = require("./routes/machine_name");
-    const machineStatusRouter = require("./routes/machine_status");
-    const machineHistoryRouter = require("./routes/machine_history");
-    const historyJobListRouter = require("./routes/history_joblist");
+    // Prefix API
+    const apiPrefix = process.env.API_PREFIX || "/api";
 
-    app.use("/api/auth", userRouter);
-    app.use("/api/inventory", inventoryRouter);
-    app.use("/api/job-list", jobListRouter);
-    app.use("/api/machine-names", machineNameRouter);
-    app.use("/api/machine-status", machineStatusRouter);
-    app.use("/api/machine-history", machineHistoryRouter);
-    app.use("/api/job-history", historyJobListRouter);
+    // Route untuk masing-masing database
+    // const userRouter = require("./routes/users"); // Menggunakan DB1 (IOT_HUB)
 
-    // Add a simple health check endpoint
-    app.get("/api/health", (req, res) => {
-      res.status(200).json({ status: "ok", message: "Server is running" });
+    // Routes using DEPT_MANUFACTURING (DB2)
+    const inventoryRouter = require("./routes/inventory"); // DB2: DEPT_MANUFACTURING - inventory_parts
+    const authRouter = require("./routes/auth"); // DB2: DEPT_MANUFACTURING - USER_NAME
+    const jobListRouter = require("./routes/joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST
+    const historyJobListRouter = require("./routes/history_joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST_HISTORY
+
+    // Routes using IOT_HUB (DB1)
+    const machineNameRouter = require("./routes/machine_name"); // DB1: IOT_HUB - CODE_MACHINE_PRODUCTION
+    const machineStatusRouter = require("./routes/machine_status"); // DB1: IOT_HUB - CODE_MACHINE_PRODUCTION
+    const machineHistoryRouter = require("./routes/machine_history"); // DB1: IOT_HUB - MACHINE_STATUS_PRODUCTION, CODE_MACHINE_PRODUCTION
+
+    // Register routes for DEPT_MANUFACTURING (DB2)
+    app.use(`${apiPrefix}/inventory`, inventoryRouter);
+    app.use(`${apiPrefix}/auth`, authRouter);
+    app.use(`${apiPrefix}/job-list`, jobListRouter);
+    app.use(`${apiPrefix}/job-history`, historyJobListRouter);
+
+    // Register routes for IOT_HUB (DB1)
+    app.use(`${apiPrefix}/machine-names`, machineNameRouter);
+    app.use(`${apiPrefix}/machine-status`, machineStatusRouter);
+    app.use(`${apiPrefix}/machine-history`, machineHistoryRouter);
+
+    // Health check endpoint
+    app.get(`${apiPrefix}/health`, (req, res) => {
+      res.status(200).json({
+        status: "ok",
+        message: "Server is running",
+        databases: {
+          db1: process.env.DB1_DATABASE, // IOT_HUB
+          db2: process.env.DB2_DATABASE, // DEPT_MANUFACTURING
+          db3: process.env.DB3_DATABASE, // PLCDATA_CKR
+        },
+      });
     });
 
     const port = process.env.PORT || 3001;
-    app.listen(port, "0.0.0.0", () =>
-      console.log(`Listening on port ${port} at http://0.0.0.0:${port}`)
+    const host = process.env.HOST || "0.0.0.0";
+
+    app.listen(port, host, () =>
+      console.log(`Server running on http://${host}:${port}`)
     );
   } catch (error) {
     console.error("Failed to start server:", error);
+    process.exit(1);
   }
 };
 
