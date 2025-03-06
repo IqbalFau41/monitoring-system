@@ -64,7 +64,7 @@ const startServer = async () => {
         databases: {
           db1: process.env.DB1_DATABASE, // IOT_HUB
           db2: process.env.DB2_DATABASE, // DEPT_MANUFACTURING
-          db3: process.env.DB3_DATABASE, // PLCDATA_CKR
+          db3: process.env.DB3_DATABASE, // MACHINE_LOG
         },
       });
     });

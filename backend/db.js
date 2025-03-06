@@ -37,14 +37,14 @@ const configDB2 = {
 };
 
 /**
- * DATABASE 3: PLCDATA_CKR
+ * DATABASE 3: MACHINE_LOG
  * No specific tables identified in the provided code
  */
 const configDB3 = {
   user: process.env.DB3_USER,
   password: process.env.DB3_PASSWORD,
   server: process.env.DB3_SERVER,
-  database: process.env.DB3_DATABASE, // PLCDATA_CKR
+  database: process.env.DB3_DATABASE, // MACHINE_LOG
   port: parseInt(process.env.DB3_PORT) || 1433,
   options: {
     encrypt: process.env.DB3_ENCRYPT === "true",
@@ -65,17 +65,17 @@ const connectDatabases = async () => {
       `Connected to ${process.env.DB2_DATABASE} Database (DEPT_MANUFACTURING)`
     );
 
-    // Koneksi ke Database 3 (PLCDATA_CKR)
+    // Koneksi ke Database 3 (MACHINE_LOG)
     const poolDB3 = await new sql.ConnectionPool(configDB3).connect();
     console.log(
-      `Connected to ${process.env.DB3_DATABASE} Database (PLCDATA_CKR)`
+      `Connected to ${process.env.DB3_DATABASE} Database (MACHINE_LOG)`
     );
 
     // Mengembalikan objek koneksi database
     return {
       iotHub: poolDB1, // DB1: IOT_HUB
       deptMfg: poolDB2, // DB2: DEPT_MANUFACTURING
-      plcData: poolDB3, // DB3: PLCDATA_CKR
+      plcData: poolDB3, // DB3: MACHINE_LOG
     };
   } catch (error) {
     console.error("Error connecting to SQL Servers:", error.message);

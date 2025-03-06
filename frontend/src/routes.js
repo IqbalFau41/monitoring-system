@@ -26,8 +26,7 @@ const Karawang = React.lazy(() => import('./views/karawang/Karawang.js'))
 const Inventory = React.lazy(() => import('./views/manufacturing/inventory/Inventory.js'))
 const JobList = React.lazy(() => import('./views/manufacturing/joblist/JobList.js'))
 const JobHistory = React.lazy(() => import('./views/manufacturing/jobhistory/JobHistory.js'))
-const AddInventory = React.lazy(() => import('./views/manufacturing/inventory/AddInventory'))
-const UpdateInventory = React.lazy(() => import('./views/manufacturing/inventory/UpdateInventory'))
+
 
 // Timeline Project
 const Charts = React.lazy(() => import('./views/charts/Charts'))
@@ -63,13 +62,7 @@ const routes = [
   { path: '/manufacturing/inventory', name: 'Inventory', element: Inventory },
   { path: '/manufacturing/jobhistory', name: 'JobHistory', element: JobHistory },
   { path: '/manufacturing/joblist', name: 'JobList', element: JobList },
-  { path: '/manufacturing/inventory/add', name: 'AddInventory', element: AddInventory },
 
-  {
-    path: '/manufacturing/inventory/update/:id',
-    name: 'UpdateInventory',
-    element: UpdateInventory,
-  },
 
   // Maintenance
 
