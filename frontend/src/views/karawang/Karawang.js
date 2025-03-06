@@ -24,6 +24,9 @@ const Karawang = () => {
   const [filteredMachines, setFilteredMachines] = useState([])
   const [location] = useState('KRW')
 
+  // Konversi kode lokasi ke nama untuk URL
+  const locationUrlName = location === 'KRW' ? 'karawang' : 'cikarang'
+
   // Fetch line groups
   useEffect(() => {
     const fetchLineGroups = async () => {
@@ -166,7 +169,7 @@ const Karawang = () => {
                     style={{ backgroundColor: headerColor }}
                   >
                     <Link
-                      to={`/karawang/machine/${encodeURIComponent(data.no_mesin)}`}
+                      to={`/${locationUrlName}/machine/${encodeURIComponent(data.no_mesin)}`}
                       style={{
                         color: 'white',
                         textDecoration: 'none',
@@ -179,7 +182,8 @@ const Karawang = () => {
                         textAlign: 'center',
                       }}
                     >
-                      <strong className="machine-name">{data.mesin}</strong>
+                      <strong className="machine-code">{data.no_mesin}</strong>
+                      <span className="machine-name">{data.mesin}</span>
                     </Link>
                   </CCardHeader>
 

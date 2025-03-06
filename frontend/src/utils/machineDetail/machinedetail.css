@@ -1,0 +1,12 @@
+.progress-stacked {
+  height: 32px !important;
+}
+
+.progress-stacked .progress {
+  height: 32px !important;
+}
+
+.progress-stacked .progress-bar {
+  height: 32px !important;
+  font-size: 1rem !important;
+}

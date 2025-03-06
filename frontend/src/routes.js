@@ -71,6 +71,7 @@ const routes = [
 
   // Machine Detail
   { path: '/cikarang/machine/:name', name: 'MachineDetail', element: MachineDetail },
+  { path: '/karawang/machine/:name', name: 'MachineDetail', element: MachineDetail },
 ]
 
 export default routes
