@@ -2,7 +2,9 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const http = require("http");
 const { connectDatabases } = require("./db");
+const setupWebSocketServer = require("./websockets");
 
 const app = express();
 
@@ -39,6 +41,7 @@ const startServer = async () => {
     const authRouter = require("./routes/auth"); // DB2: DEPT_MANUFACTURING - USER_NAME
     const jobListRouter = require("./routes/joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST
     const historyJobListRouter = require("./routes/history_joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST_HISTORY
+    const machineDetailRouter = require("./routes/machine_detail");
 
     // Routes using IOT_HUB (DB1)
     const machineNameRouter = require("./routes/machine_name"); // DB1: IOT_HUB - CODE_MACHINE_PRODUCTION
@@ -55,6 +58,7 @@ const startServer = async () => {
     app.use(`${apiPrefix}/machine-names`, machineNameRouter);
     app.use(`${apiPrefix}/machine-status`, machineStatusRouter);
     app.use(`${apiPrefix}/machine-history`, machineHistoryRouter);
+    app.use(`${apiPrefix}/machine-detail`, machineDetailRouter);
 
     // Health check endpoint
     app.get(`${apiPrefix}/health`, (req, res) => {
@@ -72,9 +76,28 @@ const startServer = async () => {
     const port = process.env.PORT || 3001;
     const host = process.env.HOST || "0.0.0.0";
 
-    app.listen(port, host, () =>
-      console.log(`Server running on http://${host}:${port}`)
+    // Create HTTP server
+    const server = http.createServer(app);
+
+    // Setup WebSocket server
+    const wsServer = setupWebSocketServer(server);
+
+    // Start HTTP server (which also handles WebSockets)
+    server.listen(port, host, () =>
+      console.log(
+        `Server running on http://${host}:${port} with WebSocket support`
+      )
     );
+
+    // Handle graceful shutdown
+    process.on("SIGTERM", () => {
+      console.log("SIGTERM signal received: closing HTTP server");
+      wsServer.close();
+      server.close(() => {
+        console.log("HTTP server closed");
+        process.exit(0);
+      });
+    });
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);

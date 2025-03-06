@@ -27,12 +27,11 @@ const Inventory = React.lazy(() => import('./views/manufacturing/inventory/Inven
 const JobList = React.lazy(() => import('./views/manufacturing/joblist/JobList.js'))
 const JobHistory = React.lazy(() => import('./views/manufacturing/jobhistory/JobHistory.js'))
 
-
 // Timeline Project
 const Charts = React.lazy(() => import('./views/charts/Charts'))
 
-// MachineDetail
-const MachineDetail = React.lazy(() => import('./views/cikarang/machineDetail/MachineDetail.js'))
+// MachineDetail - Updated import location
+const MachineDetail = React.lazy(() => import('./utils/machineDetail/MachineDetail.js'))
 
 const routes = [
   // Dashboard
@@ -63,13 +62,10 @@ const routes = [
   { path: '/manufacturing/jobhistory', name: 'JobHistory', element: JobHistory },
   { path: '/manufacturing/joblist', name: 'JobList', element: JobList },
 
-
-  // Maintenance
-
   // Timeline Project
   { path: '/charts', name: 'Charts', element: Charts },
 
-  // Machine Detail
+  // Machine Detail - Updated paths to use the new MachineDetail component
   { path: '/cikarang/machine/:name', name: 'MachineDetail', element: MachineDetail },
   { path: '/karawang/machine/:name', name: 'MachineDetail', element: MachineDetail },
 ]

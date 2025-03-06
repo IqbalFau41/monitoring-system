@@ -1,5 +1,7 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
+import { CChartLine } from '@coreui/react-chartjs'
+import { getStyle } from '@coreui/utils'
 import {
   CCard,
   CCardBody,
@@ -9,147 +11,96 @@ import {
   CCol,
   CProgress,
   CProgressStacked,
+  CButton,
+  CButtonGroup,
 } from '@coreui/react'
+import './machinedetail.css'
+import {
+  cards,
+  shifts,
+  getProductionData,
+  gridContainerStyle,
+  gridLineStyle,
+  timeTextStyle,
+  progressContainerStyle,
+} from './dataMachine.js'
 
-const MachineDetail = () => {
+const MachineDetail1 = () => {
   const { name } = useParams()
+  const chartRef = useRef(null)
+  const [viewMode, setViewMode] = useState('week') // 'week' or 'month'
 
-  // Define status cards data
-  const cards = [
-    {
-      header: 'Status mesin',
-      color: 'success',
-      content: ['Running', 'Finish: 14%'],
-    },
-    {
-      header: 'Cycle Time',
-      color: 'danger',
-      content: ['40/1 detik', 'Downtime: 25 menit'],
-    },
-    {
-      header: 'Output Produksi',
-      color: 'info',
-      content: ['Good: 3541 Pcs', 'NG: 203 Pcs'],
-    },
-    {
-      header: 'Nama Produk',
-      color: 'secondary',
-      content: ['Assembly', 'Cams Shaft Transmisi Honda'],
-    },
-    {
-      header: 'Produksi Order',
-      color: 'secondary',
-      content: ['Tanggal: 01-01-2025', 'Order: 15000 Part'],
-    },
-    {
-      header: 'Estimasi Produk',
-      color: 'secondary',
-      content: ['Estimasi Selesai: 10-01-2025', 'Actual: 3001 Part'],
-    },
-  ]
+  useEffect(() => {
+    const handleColorSchemeChange = () => {
+      if (chartRef.current) {
+        setTimeout(() => {
+          const current = chartRef.current
+          current.options.scales.x.grid.borderColor = getStyle('--cui-border-color-translucent')
+          current.options.scales.x.grid.color = getStyle('--cui-border-color-translucent')
+          current.options.scales.x.ticks.color = getStyle('--cui-body-color')
+          current.options.scales.y.grid.borderColor = getStyle('--cui-border-color-translucent')
+          current.options.scales.y.grid.color = getStyle('--cui-border-color-translucent')
+          current.options.scales.y.ticks.color = getStyle('--cui-body-color')
+          current.update()
+        })
+      }
+    }
 
-  // Define shift data with hours and progress values
-  const shifts = [
-    {
-      name: 'Shift 1',
-      hours: [
-        '07:00',
-        '08:00',
-        '09:00',
-        '10:00',
-        '11:00',
-        '12:00',
-        '13:00',
-        '14:00',
-        '15:00',
-        '16:00',
-      ],
-      progressValues: [60],
-      progressValues2: [30],
-      progressValues3: [10],
+    document.documentElement.addEventListener('ColorSchemeChange', handleColorSchemeChange)
+
+    return () => {
+      document.documentElement.removeEventListener('ColorSchemeChange', handleColorSchemeChange)
+    }
+  }, [chartRef])
+
+  const chartOptions = {
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+      },
     },
-    {
-      name: 'Shift 2',
-      hours: [
-        '16:00',
-        '17:00',
-        '18:00',
-        '19:00',
-        '20:00',
-        '21:00',
-        '22:00',
-        '23:00',
-        '00:00',
-        '01:00',
-      ],
-      progressValues: [50],
-      progressValues2: [5],
-      progressValues3: [20],
+    scales: {
+      x: {
+        grid: {
+          color: getStyle('--cui-border-color-translucent'),
+          drawOnChartArea: false,
+        },
+        ticks: {
+          color: getStyle('--cui-body-color'),
+        },
+      },
+      y: {
+        beginAtZero: true,
+        border: {
+          color: getStyle('--cui-border-color-translucent'),
+        },
+        grid: {
+          color: getStyle('--cui-border-color-translucent'),
+        },
+        max: 2500,
+        ticks: {
+          color: getStyle('--cui-body-color'),
+          maxTicksLimit: 5,
+          stepSize: Math.ceil(2500 / 5),
+        },
+      },
     },
-    {
-      name: 'Shift 3',
-      hours: ['01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00'],
-      progressValues: [10],
-      progressValues2: [15],
-      progressValues3: [10],
+    elements: {
+      line: {
+        tension: 0.4,
+      },
+      point: {
+        radius: 0,
+        hitRadius: 10,
+        hoverRadius: 4,
+        hoverBorderWidth: 3,
+      },
     },
-  ]
-
-  const gridContainerStyle = {
-    position: 'relative',
-    width: '100%',
-    marginBottom: '5px',
-    padding: '0',
-    height: '120px',
-  }
-
-  const gridLineStyle = {
-    position: 'absolute',
-    top: 25,
-    bottom: 25,
-    width: '2px',
-    backgroundColor: 'rgba(200, 200, 200, 0.5)',
-    zIndex: 1,
-  }
-
-  const timeTextStyle = {
-    position: 'absolute',
-    transform: 'translateX(-50%)',
-    width: 'auto',
-    fontSize: '0.9rem',
-    padding: '0 5px',
-  }
-
-  // Updated progress container style with height property for thicker bars
-  const progressContainerStyle = {
-    position: 'absolute',
-    left: '0',
-    right: '0',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    zIndex: 2,
-    padding: '0',
-    height: '32px', // Added height for thicker progress bars
   }
 
   return (
     <div>
-      {/* Added styles for thicker progress bars */}
-      <style>
-        {`
-          .progress-stacked {
-            height: 32px !important;
-          }
-          .progress-stacked .progress {
-            height: 32px !important;
-          }
-          .progress-stacked .progress-bar {
-            height: 32px !important;
-            font-size: 1rem !important;
-          }
-        `}
-      </style>
-
       <h2>Detail Mesin: {decodeURIComponent(name)}</h2>
 
       {/* Status cards section */}
@@ -179,20 +130,19 @@ const MachineDetail = () => {
               </CCardHeader>
               <CCardBody className="p-4">
                 <div style={gridContainerStyle}>
-                  {shift.hours.map((hour, index) => {
-                    const position = `${(100 * index) / (shift.hours.length - 1)}%`
+                  {shift.hours.map((hour, hourIndex) => {
+                    const position = `${(100 * hourIndex) / (shift.hours.length - 1)}%`
                     return (
-                      <React.Fragment key={index}>
+                      <React.Fragment key={hourIndex}>
                         <span style={{ ...timeTextStyle, top: '0', left: position }}>{hour}</span>
                         <div style={{ ...gridLineStyle, left: position }} />
                         <span style={{ ...timeTextStyle, bottom: '0', left: position }}>
-                          {index * 10}
+                          {hourIndex * 10}
                         </span>
                       </React.Fragment>
                     )
                   })}
 
-                  {/* Progress bar with updated positioning */}
                   <div style={progressContainerStyle}>
                     <CProgressStacked className="progress-stacked">
                       {shift.progressValues.map((value, valueIndex) => (
@@ -212,8 +162,48 @@ const MachineDetail = () => {
           </CCol>
         ))}
       </CRow>
+
+      {/* Monthly Production Performance Section */}
+      <CRow className="mb-3 align-items-center">
+        <CCol md={6}>
+          <h2 className="m-0">Performa Produksi Bulanan</h2>
+        </CCol>
+      </CRow>
+      <CRow>
+        <CCol md={12}>
+          <CCard className="mb-3">
+            <CCardHeader className="d-flex justify-content-between align-items-center text-body">
+              <strong>
+                {viewMode === 'week' ? 'Grafik Produksi Mingguan' : 'Grafik Produksi Bulanan'}
+              </strong>
+              <CButtonGroup size="sm">
+                <CButton
+                  color={viewMode === 'week' ? 'primary' : 'outline-primary'}
+                  onClick={() => setViewMode('week')}
+                >
+                  Week
+                </CButton>
+                <CButton
+                  color={viewMode === 'month' ? 'primary' : 'outline-primary'}
+                  onClick={() => setViewMode('month')}
+                >
+                  Month
+                </CButton>
+              </CButtonGroup>
+            </CCardHeader>
+            <CCardBody className="p-4">
+              <CChartLine
+                ref={chartRef}
+                style={{ height: '300px', marginTop: '40px' }}
+                data={getProductionData(viewMode)}
+                options={chartOptions}
+              />
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
     </div>
   )
 }
 
-export default MachineDetail
+export default MachineDetail1

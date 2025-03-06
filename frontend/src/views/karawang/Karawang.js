@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import {
   CRow,
@@ -23,11 +23,16 @@ const Karawang = () => {
   const [error, setError] = useState(null)
   const [filteredMachines, setFilteredMachines] = useState([])
   const [location] = useState('KRW')
+  const [lastUpdate, setLastUpdate] = useState(new Date())
+  const [socketConnected, setSocketConnected] = useState(false)
+
+  // WebSocket reference
+  const socketRef = useRef(null)
 
   // Konversi kode lokasi ke nama untuk URL
   const locationUrlName = location === 'KRW' ? 'karawang' : 'cikarang'
 
-  // Fetch line groups
+  // Fetch line groups once
   useEffect(() => {
     const fetchLineGroups = async () => {
       try {
@@ -42,73 +47,174 @@ const Karawang = () => {
     fetchLineGroups()
   }, [location])
 
-  // Fetch machine names and status
+  // Initial data fetch
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true)
+
+      // Make parallel API calls for machine names and production history
+      const [machineResponse, historyResponse] = await Promise.all([
+        axios.get(`/api/machine-names/${location}`, {
+          params: selectedLineGroup ? { lineGroup: selectedLineGroup } : undefined,
+        }),
+        axios.get(`/api/machine-history/${location}`, {
+          params: selectedLineGroup ? { lineGroup: selectedLineGroup } : undefined,
+        }),
+      ])
+
+      // Transform machine data
+      const transformedData = machineResponse.data.map((machine) => {
+        // Find the most recent history record for this machine
+        const machineHistory =
+          historyResponse.data
+            .filter((history) => history.MachineCode === machine.MACHINE_CODE)
+            .sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt))[0] || {}
+
+        const statusConfig = getStatusConfig(machineHistory.OPERATION_NAME || 'Shutdown')
+
+        // Calculate performance metrics
+        const actual = machineHistory.MACHINE_COUNTER || 0
+        const plan = 1000 // You may want to define a way to get planned production
+        const performance = plan > 0 ? Math.round((actual / plan) * 100) : 0
+
+        return {
+          no_mesin: machine.MACHINE_CODE,
+          mesin: machine.MACHINE_NAME,
+          lineGroup: machine.LINE_GROUP,
+          status: machineHistory.OPERATION_NAME || 'Shutdown',
+          message: statusConfig.displayName,
+          Plan: plan,
+          actual: actual,
+          performance: `${performance}%`,
+          startTime: machineHistory.CreatedAt,
+          statusConfig: statusConfig,
+        }
+      })
+
+      setMachineNames(transformedData)
+      applyLineGroupFilter(transformedData)
+      setLastUpdate(new Date())
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching initial machine data:', err)
+      setError(err)
+      setLoading(false)
+    }
+  }
+
+  // Apply filtering based on selected line group
+  const applyLineGroupFilter = (machines) => {
+    if (selectedLineGroup === '') {
+      setFilteredMachines(machines)
+    } else {
+      setFilteredMachines(machines.filter((machine) => machine.lineGroup === selectedLineGroup))
+    }
+  }
+
+  // Setup WebSocket connection
   useEffect(() => {
-    const fetchMachineNames = async () => {
-      try {
-        setLoading(true)
-        // Make parallel API calls for machine names and production history
-        const [machineResponse, historyResponse] = await Promise.all([
-          axios.get(`/api/machine-names/${location}`, {
-            params: selectedLineGroup ? { lineGroup: selectedLineGroup } : undefined,
-          }),
-          axios.get(`/api/machine-history/${location}`, {
-            params: selectedLineGroup ? { lineGroup: selectedLineGroup } : undefined,
-          }),
-        ])
+    // Fetch initial data first
+    fetchInitialData()
 
-        // Transform machine data
-        const transformedData = machineResponse.data.map((machine) => {
-          // Find the most recent history record for this machine
-          const machineHistory =
-            historyResponse.data
-              .filter((history) => history.MachineCode === machine.MACHINE_CODE)
-              .sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt))[0] || {}
+    // Establish WebSocket connection
+    const setupWebSocket = () => {
+      // Use secure WebSocket if on HTTPS, otherwise standard WebSocket
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const host = window.location.host
 
-          const statusConfig = getStatusConfig(machineHistory.OPERATION_NAME || 'Shutdown')
-
-          // Calculate performance metrics
-          const actual = machineHistory.MACHINE_COUNTER || 0
-          const plan = 100 // You may want to define a way to get planned production
-          const performance = plan > 0 ? Math.round((actual / plan) * 100) : 0
-
-          return {
-            no_mesin: machine.MACHINE_CODE,
-            mesin: machine.MACHINE_NAME,
-            lineGroup: machine.LINE_GROUP,
-            status: machineHistory.OPERATION_NAME || 'Shutdown',
-            message: statusConfig.displayName,
-            Plan: plan,
-            actual: actual,
-            performance: `${performance}%`,
-            startTime: machineHistory.CreatedAt,
-          }
-        })
-
-        setMachineNames(transformedData)
-        setFilteredMachines(transformedData)
-        setLoading(false)
-      } catch (err) {
-        console.error('Error fetching machine data:', err)
-        setError(err)
-        setLoading(false)
+      // Build URL with query parameters for location and lineGroup
+      let wsUrl = `${protocol}//${host}/ws/machines?location=${location}`
+      if (selectedLineGroup) {
+        wsUrl += `&lineGroup=${selectedLineGroup}`
       }
+
+      if (socketRef.current) {
+        socketRef.current.close()
+      }
+
+      const socket = new WebSocket(wsUrl)
+
+      socket.onopen = () => {
+        console.log('WebSocket connection established')
+        setSocketConnected(true)
+      }
+
+      socket.onmessage = (event) => {
+        try {
+          const messageData = JSON.parse(event.data)
+
+          // Check if this is a machineData message
+          if (messageData.type === 'machineData') {
+            setMachineNames(messageData.data)
+            applyLineGroupFilter(messageData.data)
+            setLastUpdate(new Date(messageData.timestamp))
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error)
+        }
+      }
+
+      socket.onclose = (event) => {
+        console.log('WebSocket connection closed:', event.code, event.reason)
+        setSocketConnected(false)
+
+        // Attempt to reconnect after a delay if not closed intentionally
+        if (event.code !== 1000) {
+          setTimeout(() => {
+            console.log('Attempting to reconnect WebSocket...')
+            setupWebSocket()
+          }, 3000)
+        }
+      }
+
+      socket.onerror = (error) => {
+        console.error('WebSocket error:', error)
+        setSocketConnected(false)
+      }
+
+      socketRef.current = socket
     }
 
-    fetchMachineNames()
-  }, [location, selectedLineGroup])
+    setupWebSocket()
+
+    // Cleanup WebSocket on component unmount
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close()
+      }
+    }
+  }, [location, selectedLineGroup]) // Include selectedLineGroup in dependencies
 
   // Handle line group change
   const handleLineGroupChange = (e) => {
     const lineGroup = e.target.value
     setSelectedLineGroup(lineGroup)
+  }
 
-    if (lineGroup === '') {
-      setFilteredMachines(machineNames)
-    } else {
-      setFilteredMachines(machineNames.filter((machine) => machine.lineGroup === lineGroup))
+  // Manual refresh function
+  const handleManualRefresh = () => {
+    fetchInitialData()
+  }
+
+  // Send filter update to WebSocket server
+  const updateFilters = () => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(
+        JSON.stringify({
+          type: 'setFilters',
+          location: location,
+          lineGroup: selectedLineGroup,
+        }),
+      )
     }
   }
+
+  // Update filters when line group changes
+  useEffect(() => {
+    updateFilters()
+    // Also apply filtering to existing machine data
+    applyLineGroupFilter(machineNames)
+  }, [selectedLineGroup])
 
   // Error handling
   if (error) {
@@ -116,6 +222,11 @@ const Karawang = () => {
       <CRow>
         <CCol className="text-center text-danger">
           Error loading machine names: {error.message}
+          <div className="mt-3">
+            <button className="btn btn-primary" onClick={handleManualRefresh}>
+              Retry
+            </button>
+          </div>
         </CCol>
       </CRow>
     )
@@ -124,8 +235,27 @@ const Karawang = () => {
   return (
     <>
       <CRow className="mb-3">
-        <CCol>
+        <CCol md={6}>
           <h2>Karawang Machine Monitor</h2>
+        </CCol>
+        <CCol md={6} className="text-end">
+          <div className="d-flex justify-content-end align-items-center">
+            <CBadge
+              color={socketConnected ? 'success' : 'danger'}
+              shape="rounded-pill"
+              className="me-3 px-3 py-2"
+            >
+              {socketConnected ? 'Connected' : 'Disconnected'}
+            </CBadge>
+            <span className="me-3">Last updated: {lastUpdate.toLocaleTimeString()}</span>
+            <button
+              className="btn btn-outline-primary"
+              onClick={handleManualRefresh}
+              disabled={loading}
+            >
+              {loading ? <CSpinner size="sm" /> : <span>↻ Refresh</span>}
+            </button>
+          </div>
         </CCol>
       </CRow>
 
@@ -157,7 +287,8 @@ const Karawang = () => {
       ) : (
         <CRow className="d-flex align-items-stretch">
           {filteredMachines.map((data, index) => {
-            const { borderColor, headerColor } = getStatusConfig(data.status)
+            const statusConfig = data.statusConfig || getStatusConfig(data.status)
+            const { borderColor, headerColor } = statusConfig
             const signalClasses = generateDefaultSignal(data.status)
             const progress = data.actual ? Math.min((data.actual / (data.Plan || 1)) * 100, 100) : 0
 

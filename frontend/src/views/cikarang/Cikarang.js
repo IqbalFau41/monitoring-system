@@ -166,7 +166,7 @@ const Cikarang = () => {
                     style={{ backgroundColor: headerColor }}
                   >
                     <Link
-                      to={`/karawang/machine/${encodeURIComponent(data.no_mesin)}`}
+                      to={`/cikarang/machine/${encodeURIComponent(data.no_mesin)}`}
                       style={{
                         color: 'white',
                         textDecoration: 'none',
