@@ -1,15 +1,5 @@
 import React from 'react'
 
-// Dashboard
-const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
-
-// Cikarang Plant
-const AllCikarang = React.lazy(() => import('./views/cikarang/allcikarang/AllCikarang.js'))
-const Algt = React.lazy(() => import('./views/cikarang/algt/Algt'))
-const Balancer = React.lazy(() => import('./views/cikarang/balancer/Balancer'))
-const Cashting = React.lazy(() => import('./views/cikarang/cashting/Cashting'))
-const Finishing = React.lazy(() => import('./views/cikarang/finishing/Finishing'))
-
 // Karawang Plant
 const AllKarawang = React.lazy(() => import('./views/karawang/allkarawang/AllKarawang.js'))
 const Sc_Camshaft = React.lazy(() => import('./views/karawang/sc_camshaft/Sc_Camshaft.js'))
@@ -34,17 +24,6 @@ const Charts = React.lazy(() => import('./views/charts/Charts'))
 const MachineDetail = React.lazy(() => import('./utils/machineDetail/MachineDetail.js'))
 
 const routes = [
-  // Dashboard
-  { path: '/', exact: true, name: 'Home' },
-  { path: '/dashboard', name: 'Dashboard', element: Dashboard },
-
-  // Cikarang Plant
-  { path: '/cikarang/allcikarang', name: 'AllCikarang', element: AllCikarang },
-  { path: '/cikarang/algt', name: 'Algt', element: Algt },
-  { path: '/cikarang/balancer', name: 'Balancer', element: Balancer },
-  { path: '/cikarang/cashting', name: 'Cashting', element: Cashting },
-  { path: '/cikarang/finishing', name: 'Finishing', element: Finishing },
-
   // Karawang Plant
   { path: '/karawang/allkarawang', name: 'AllKarawang', element: AllKarawang },
   { path: '/karawang/sc_camshaft', name: 'Sc_Camshaft', element: Sc_Camshaft },

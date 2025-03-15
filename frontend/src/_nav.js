@@ -1,21 +1,12 @@
 import React from 'react'
 import CIcon from '@coreui/icons-react'
-import {
-  cilIndustry,
-  cilNotes,
-  cilChartPie,
-  cilStar,
-  cilExternalLink,
-  cilSpeedometer,
-} from '@coreui/icons'
+import { cilIndustry, cilNotes, cilChartPie, cilStar, cilExternalLink } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
 const _nav = [
   {
-    component: CNavItem,
-    name: 'Dashboard',
-    to: '/dashboard',
-    icon: <CIcon icon={cilSpeedometer} customClassName="nav-icon" />,
+    component: CNavTitle,
+    name: 'production',
   },
   {
     component: CNavItem,
@@ -28,60 +19,6 @@ const _nav = [
     name: 'Karawang Plant',
     to: '/karawang',
     icon: <CIcon icon={cilIndustry} customClassName="nav-icon" />,
-  },
-
-  {
-    component: CNavTitle,
-    name: 'maintenance',
-  },
-  {
-    component: CNavGroup,
-    name: 'Cikarang Old',
-    icon: <CIcon icon={cilIndustry} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'All Machine Cikarang',
-        to: '/cikarang/allcikarang',
-      },
-      {
-        component: CNavItem,
-        name: 'ALGT',
-        to: '/cikarang/algt',
-      },
-      {
-        component: CNavItem,
-        name: 'Balancer',
-        to: '/cikarang/balancer',
-      },
-      {
-        component: CNavItem,
-        name: 'Cashting',
-        to: '/cikarang/cashting',
-      },
-      {
-        component: CNavItem,
-        name: 'Finishing',
-        to: '/cikarang/finishing',
-      },
-    ],
-  },
-  {
-    component: CNavGroup,
-    name: 'Karawang Old',
-    icon: <CIcon icon={cilIndustry} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'All Machine Karawang',
-        to: '/karawang/allkarawang',
-      },
-      {
-        component: CNavItem,
-        name: 'SC Camshaft',
-        to: '/karawang/sc_camshaft',
-      },
-    ],
   },
   {
     component: CNavItem,
@@ -130,6 +67,23 @@ const _nav = [
   {
     component: CNavTitle,
     name: 'Extras',
+  },
+  {
+    component: CNavGroup,
+    name: 'Tester',
+    icon: <CIcon icon={cilIndustry} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'All Machine Karawang',
+        to: '/karawang/allkarawang',
+      },
+      {
+        component: CNavItem,
+        name: 'SC Camshaft',
+        to: '/karawang/sc_camshaft',
+      },
+    ],
   },
   {
     component: CNavGroup,

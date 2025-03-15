@@ -10,20 +10,13 @@ import {
   CCardText,
   CRow,
   CCol,
-  CProgress,
-  CProgressStacked,
   CButton,
   CButtonGroup,
   CSpinner,
-  CBadge,
 } from '@coreui/react'
 import './machinedetail.css'
-import {
-  gridContainerStyle,
-  gridLineStyle,
-  timeTextStyle,
-  progressContainerStyle,
-} from './dataMachine.js'
+import { chartOptions } from './dataMachine.js'
+import ShiftDetail from './CProgress/ShiftDetail.js'
 
 const MachineDetail = () => {
   const { name } = useParams()
@@ -100,53 +93,6 @@ const MachineDetail = () => {
     }
   }
 
-  // Chart configuration
-  const chartOptions = {
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: true,
-      },
-    },
-    scales: {
-      x: {
-        grid: {
-          color: getStyle('--cui-border-color-translucent'),
-          drawOnChartArea: false,
-        },
-        ticks: {
-          color: getStyle('--cui-body-color'),
-        },
-      },
-      y: {
-        beginAtZero: true,
-        border: {
-          color: getStyle('--cui-border-color-translucent'),
-        },
-        grid: {
-          color: getStyle('--cui-border-color-translucent'),
-        },
-        max: 2500,
-        ticks: {
-          color: getStyle('--cui-body-color'),
-          maxTicksLimit: 5,
-          stepSize: Math.ceil(2500 / 5),
-        },
-      },
-    },
-    elements: {
-      line: {
-        tension: 0.4,
-      },
-      point: {
-        radius: 0,
-        hitRadius: 10,
-        hoverRadius: 4,
-        hoverBorderWidth: 3,
-      },
-    },
-  }
-
   // Generate status cards from machine data
   const generateStatusCards = () => {
     if (!machineData.latestRecord) return []
@@ -183,62 +129,12 @@ const MachineDetail = () => {
         header: 'Production Summary',
         content: [
           `Today's Production: ${MACHINE_COUNTER || 0}`,
-          `Target: 2,000 pcs`, // Example static target
-          `Efficiency: ${Math.round((MACHINE_COUNTER || 0) / 20)}%`, // Example calculation
+          `Target: ${machineData.machineInfo?.TARGET_PRODUCTION || 2000} pcs`,
+          `Efficiency: ${Math.round(((MACHINE_COUNTER || 0) / (machineData.machineInfo?.TARGET_PRODUCTION || 2000)) * 100)}%`,
         ],
         color: 'info',
       },
     ]
-  }
-
-  // Generate shift data for display with proper time-based formatting
-  const generateShiftData = () => {
-    if (!machineData.shifts || machineData.shifts.length === 0) return []
-
-    // Define shift times
-    const shiftTimes = {
-      'Shift 1': { start: '07:00', end: '15:00' },
-      'Shift 2': { start: '15:00', end: '23:00' },
-      'Shift 3': { start: '23:00', end: '07:00' },
-    }
-
-    return machineData.shifts.map((shift) => {
-      const shiftInfo = shiftTimes[shift.name] || { start: '00:00', end: '08:00' }
-
-      // Generate hours for the shift based on actual times
-      const hours = []
-      const progressValues = []
-      const progressValues2 = []
-      const progressValues3 = []
-
-      // Parse start time
-      const [startHour, startMinute] = shiftInfo.start.split(':').map(Number)
-      const [endHour, endMinute] = shiftInfo.end.split(':').map(Number)
-
-      // Calculate total hours in shift (handling overnight shifts)
-      let totalHours = endHour - startHour
-      if (totalHours <= 0) totalHours += 24
-
-      // Create hour markers for the shift
-      for (let i = 0; i <= totalHours; i++) {
-        let hourMarker = (startHour + i) % 24
-        hours.push(`${hourMarker.toString().padStart(2, '0')}:00`)
-
-        // Example calculation for progress values
-        // In a real implementation, you would calculate these from your data
-        progressValues.push(Math.floor(Math.random() * 20) + 10)
-        progressValues2.push(Math.floor(Math.random() * 10))
-        progressValues3.push(Math.floor(Math.random() * 5))
-      }
-
-      return {
-        name: shift.name,
-        hours,
-        progressValues,
-        progressValues2,
-        progressValues3,
-      }
-    })
   }
 
   // If error occurred
@@ -259,7 +155,6 @@ const MachineDetail = () => {
   }
 
   const cards = generateStatusCards()
-  const shifts = generateShiftData()
 
   return (
     <div>
@@ -307,93 +202,8 @@ const MachineDetail = () => {
           </CRow>
 
           {/* Production details section */}
-          <h2>Detail Production</h2>
           <CRow>
-            {shifts.map((shift, index) => (
-              <CCol md={12} key={index}>
-                <CCard className="mb-3">
-                  <CCardHeader className="text-body">
-                    <strong>{shift.name}</strong>
-                  </CCardHeader>
-                  <CCardBody className="p-4">
-                    <div style={gridContainerStyle}>
-                      {shift.hours.map((hour, hourIndex) => {
-                        const position = `${(100 * hourIndex) / (shift.hours.length - 1)}%`
-                        return (
-                          <React.Fragment key={hourIndex}>
-                            <span style={{ ...timeTextStyle, top: '0', left: position }}>
-                              {hour}
-                            </span>
-                            <div style={{ ...gridLineStyle, left: position }} />
-                            <span style={{ ...timeTextStyle, bottom: '0', left: position }}>
-                              {hourIndex * 10}
-                            </span>
-                          </React.Fragment>
-                        )
-                      })}
-
-                      <div style={progressContainerStyle}>
-                        <CProgressStacked className="progress-stacked">
-                          {shift.progressValues.map((value, valueIndex) => (
-                            <CProgress key={valueIndex} color="success" value={value} />
-                          ))}
-                          {shift.progressValues2.map((value, valueIndex) => (
-                            <CProgress key={`2-${valueIndex}`} color="danger" value={value} />
-                          ))}
-                          {shift.progressValues3.map((value, valueIndex) => (
-                            <CProgress key={`3-${valueIndex}`} color="warning" value={value} />
-                          ))}
-                        </CProgressStacked>
-                      </div>
-                    </div>
-                  </CCardBody>
-                </CCard>
-              </CCol>
-            ))}
-          </CRow>
-
-          {/* Monthly Production Performance Section */}
-          <CRow className="mb-3 align-items-center">
-            <CCol md={6}>
-              <h2 className="m-0">Performa Produksi Bulanan</h2>
-            </CCol>
-          </CRow>
-          <CRow>
-            <CCol md={12}>
-              <CCard className="mb-3">
-                <CCardHeader className="d-flex justify-content-between align-items-center text-body">
-                  <strong>
-                    {viewMode === 'week' ? 'Grafik Produksi Mingguan' : 'Grafik Produksi Bulanan'}
-                  </strong>
-                  <CButtonGroup size="sm">
-                    <CButton
-                      color={viewMode === 'week' ? 'primary' : 'outline-primary'}
-                      onClick={() => setViewMode('week')}
-                    >
-                      Week
-                    </CButton>
-                    <CButton
-                      color={viewMode === 'month' ? 'primary' : 'outline-primary'}
-                      onClick={() => setViewMode('month')}
-                    >
-                      Month
-                    </CButton>
-                  </CButtonGroup>
-                </CCardHeader>
-                <CCardBody className="p-4">
-                  <CChartLine
-                    ref={chartRef}
-                    style={{ height: '300px', marginTop: '40px' }}
-                    data={
-                      viewMode === 'week'
-                        ? machineData.chartData.weekly
-                        : machineData.chartData.monthly
-                    }
-                    options={chartOptions}
-                  />
-                </CCardBody>
-              </CCard>
-            </CCol>
+            <ShiftDetail shifts={machineData.shifts || []} />
           </CRow>
         </>
       )}

@@ -36,8 +36,8 @@ const Login = () => {
       const { token } = response.data // Sesuaikan dengan struktur respons backend
       localStorage.setItem('token', token) // Simpan token di local storage
 
-      // Redirect ke dashboard
-      navigate('/dashboard') // Ganti dengan route dashboard Anda
+      // Redirect ke cikarang
+      navigate('/cikarang') // Ganti dengan route cikarang Anda
     } catch (error) {
       if (error.response && error.response.status >= 400 && error.response.status <= 500) {
         setError(error.response.data.message) // Set pesan kesalahan dari respons

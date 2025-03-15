@@ -101,24 +101,65 @@ const prepareChartData = (data) => {
 const processShiftData = (data) => {
   // Define shifts
   const shifts = [
-    { name: "Shift 1 (06:00 - 14:00)", data: [], hours: [] },
-    { name: "Shift 2 (14:00 - 22:00)", data: [], hours: [] },
-    { name: "Shift 3 (22:00 - 06:00)", data: [], hours: [] },
+    {
+      name: "Shift 1 (07:00 - 15:00)",
+      data: [],
+      hours: [
+        "07:00",
+        "08:00",
+        "09:00",
+        "10:00",
+        "11:00",
+        "12:00",
+        "13:00",
+        "14:00",
+        "15:00",
+      ],
+      productionValues: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      goodParts: 0,
+      defectiveParts: 0,
+      downtime: 0,
+    },
+    {
+      name: "Shift 2 (14:00 - 22:00)",
+      data: [],
+      hours: [
+        "15:00",
+        "16:00",
+        "17:00",
+        "18:00",
+        "19:00",
+        "20:00",
+        "21:00",
+        "22:00",
+      ],
+      productionValues: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      goodParts: 0,
+      defectiveParts: 0,
+      downtime: 0,
+    },
+    {
+      name: "Shift 3 (22:00 - 06:00)",
+      data: [],
+      hours: [
+        "22:00",
+        "23:00",
+        "00:00",
+        "01:00",
+        "02:00",
+        "03:00",
+        "04:00",
+        "05:00",
+        "06:00",
+      ],
+      productionValues: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+      goodParts: 0,
+      defectiveParts: 0,
+      downtime: 0,
+    },
   ];
 
-  // Initialize hours for each shift
-  shifts.forEach((shift) => {
-    for (let i = 0; i < 9; i++) {
-      shift.hours.push(`${i}h`);
-    }
-
-    // Initialize progress arrays
-    shift.progressValues = Array(8).fill(0);
-    shift.progressValues2 = Array(8).fill(0);
-    shift.progressValues3 = Array(8).fill(0);
-  });
-
-  // Group data by shift
+  // Group data by shift and calculate totals
   data.forEach((record) => {
     const recordDate = new Date(record.CreatedAt);
     const hour = recordDate.getHours();
@@ -136,24 +177,70 @@ const processShiftData = (data) => {
     // Add record to appropriate shift
     shifts[shiftIndex].data.push(record);
 
-    // Update progress values
-    // This is a simplified example - you would need to adapt based on your actual data structure
-    const hourPosition = hour % 8;
+    // Update production values for the specific hour
+    const hourIndex = (hour - 6 + 24) % 24; // Adjust for 24-hour format
+    const normalizedHourIndex = Math.floor(hourIndex / 8); // Normalize to 0-7 range within shift
 
-    // Use the MACHINE_COUNTER or other relevant fields to update progress values
+    // Increment the production value for this hour
+    shifts[shiftIndex].productionValues[normalizedHourIndex] +=
+      record.MACHINE_COUNTER || 0;
+
+    // Update status counters based on operation name
     if (record.OPERATION_NAME === "Normal Operation") {
-      shifts[shiftIndex].progressValues[hourPosition] += 10;
+      shifts[shiftIndex].goodParts += 25; // Percentage for progress bar
     } else if (record.OPERATION_NAME === "Warning") {
-      shifts[shiftIndex].progressValues2[hourPosition] += 10;
+      shifts[shiftIndex].defectiveParts += 15; // Percentage for progress bar
     } else {
-      shifts[shiftIndex].progressValues3[hourPosition] += 10;
+      shifts[shiftIndex].downtime += 10; // Percentage for progress bar
+    }
+  });
+
+  // Cap percentages at 100%
+  shifts.forEach((shift) => {
+    const total = shift.goodParts + shift.defectiveParts + shift.downtime;
+    if (total > 100) {
+      const scaleFactor = 100 / total;
+      shift.goodParts = Math.floor(shift.goodParts * scaleFactor);
+      shift.defectiveParts = Math.floor(shift.defectiveParts * scaleFactor);
+      shift.downtime = Math.floor(shift.downtime * scaleFactor);
     }
   });
 
   return shifts;
 };
 
+/**
+ * Process machine data to generate response for frontend
+ * @param {Object} machineInfo - Information about the machine
+ * @param {Array} machineData - Array of machine records
+ * @returns {Object} Processed data for frontend
+ */
+const processMachineData = (machineInfo, machineData) => {
+  // Sort data by date
+  const sortedData = [...machineData].sort(
+    (a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt)
+  );
+
+  // Get latest record
+  const latestRecord =
+    sortedData.length > 0 ? sortedData[sortedData.length - 1] : null;
+
+  // Process shift data
+  const shifts = processShiftData(sortedData);
+
+  // Prepare chart data
+  const chartData = prepareChartData(sortedData);
+
+  return {
+    machineInfo,
+    latestRecord,
+    shifts,
+    chartData,
+  };
+};
+
 module.exports = {
   prepareChartData,
   processShiftData,
+  processMachineData,
 };
