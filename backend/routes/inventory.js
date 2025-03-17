@@ -4,11 +4,11 @@ const router = express.Router();
 
 // Middleware for validating body
 const validateBody = (req, res, next) => {
-  const { name_part, qty_part, date_part } = req.body;
+  const { name_part, qty_part } = req.body;
 
-  if (!name_part || qty_part === undefined || !date_part) {
+  if (!name_part || qty_part === undefined) {
     return res.status(400).json({
-      error: "Name, Quantity, and Date are required",
+      error: "Name and Quantity are required",
     });
   }
   next();
@@ -27,7 +27,14 @@ router.get("/", async (req, res) => {
 
     const request = deptMfg.request();
     const result = await request.query(`
-      SELECT * FROM inventory_parts
+      SELECT 
+        no_part, 
+        name_part, 
+        type_part, 
+        maker_part, 
+        qty_part, 
+        information_part 
+      FROM INVENTORY_PARTS
       ORDER BY no_part DESC
     `);
 
@@ -61,8 +68,14 @@ router.get("/:id", async (req, res) => {
     request.input("id", id);
 
     const result = await request.query(`
-      SELECT *
-      FROM inventory_parts 
+      SELECT 
+        no_part, 
+        name_part, 
+        type_part, 
+        maker_part, 
+        qty_part, 
+        information_part 
+      FROM INVENTORY_PARTS 
       WHERE no_part = @id
     `);
 
@@ -90,20 +103,27 @@ router.post("/", validateBody, async (req, res) => {
     }
 
     const request = deptMfg.request();
-    request.input("date_part", req.body.date_part);
-    request.input("delivery_note", req.body.delivery_note || null);
-    request.input("purchase_order", req.body.purchase_order || null);
+
+    // Required fields
     request.input("name_part", req.body.name_part);
+    request.input("qty_part", req.body.qty_part);
+
+    // Optional fields
     request.input("type_part", req.body.type_part || null);
     request.input("maker_part", req.body.maker_part || null);
-    request.input("qty_part", req.body.qty_part);
+    request.input("information_part", req.body.information_part || null);
+
+    // Additional fields that might be required by the database
+    const currentDate = new Date().toISOString().split("T")[0];
+    request.input("date_part", req.body.date_part || currentDate);
+    request.input("delivery_note", req.body.delivery_note || null);
+    request.input("purchase_order", req.body.purchase_order || null);
     request.input("unit_part", req.body.unit_part || null);
     request.input("recipient_part", req.body.recipient_part || null);
-    request.input("information_part", req.body.information_part || null);
     request.input("pic_part", req.body.pic_part || null);
 
     await request.query(`
-      INSERT INTO inventory_parts (
+      INSERT INTO INVENTORY_PARTS (
         date_part, 
         delivery_note, 
         purchase_order, 
@@ -160,7 +180,7 @@ router.put("/:id", validateBody, async (req, res) => {
     checkRequest.input("id", id);
 
     const checkItem = await checkRequest.query(`
-      SELECT no_part FROM inventory_parts WHERE no_part = @id
+      SELECT no_part FROM INVENTORY_PARTS WHERE no_part = @id
     `);
 
     if (checkItem.recordset.length === 0) {
@@ -170,20 +190,27 @@ router.put("/:id", validateBody, async (req, res) => {
     // Update item
     const updateRequest = deptMfg.request();
     updateRequest.input("id", id);
-    updateRequest.input("date_part", req.body.date_part);
-    updateRequest.input("delivery_note", req.body.delivery_note || null);
-    updateRequest.input("purchase_order", req.body.purchase_order || null);
+
+    // Required fields
     updateRequest.input("name_part", req.body.name_part);
+    updateRequest.input("qty_part", req.body.qty_part);
+
+    // Optional fields
     updateRequest.input("type_part", req.body.type_part || null);
     updateRequest.input("maker_part", req.body.maker_part || null);
-    updateRequest.input("qty_part", req.body.qty_part);
+    updateRequest.input("information_part", req.body.information_part || null);
+
+    // Additional fields that might be required by the database
+    const currentDate = new Date().toISOString().split("T")[0];
+    updateRequest.input("date_part", req.body.date_part || currentDate);
+    updateRequest.input("delivery_note", req.body.delivery_note || null);
+    updateRequest.input("purchase_order", req.body.purchase_order || null);
     updateRequest.input("unit_part", req.body.unit_part || null);
     updateRequest.input("recipient_part", req.body.recipient_part || null);
-    updateRequest.input("information_part", req.body.information_part || null);
     updateRequest.input("pic_part", req.body.pic_part || null);
 
     await updateRequest.query(`
-      UPDATE inventory_parts 
+      UPDATE INVENTORY_PARTS 
       SET 
         date_part = @date_part, 
         delivery_note = @delivery_note, 
@@ -229,7 +256,7 @@ router.delete("/:id", async (req, res) => {
     checkRequest.input("id", id);
 
     const checkItem = await checkRequest.query(`
-      SELECT no_part FROM inventory_parts WHERE no_part = @id
+      SELECT no_part FROM INVENTORY_PARTS WHERE no_part = @id
     `);
 
     if (checkItem.recordset.length === 0) {
@@ -241,7 +268,7 @@ router.delete("/:id", async (req, res) => {
     deleteRequest.input("id", id);
 
     await deleteRequest.query(`
-      DELETE FROM inventory_parts WHERE no_part = @id
+      DELETE FROM INVENTORY_PARTS WHERE no_part = @id
     `);
     res.status(200).json({ message: "Item deleted successfully" });
   } catch (error) {

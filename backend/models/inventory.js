@@ -1,30 +1,33 @@
-//backend/models/inventory.js
-/**
- * DATABASE: DEPT_MANUFACTURING (DB2)
- * TABLE: inventory_parts
- */
+// models/inventory.js
 const sql = require("mssql");
 
-// Fungsi untuk membuat item inventaris baru
+// Function to create a new inventory item
 const createInventoryItem = async (data) => {
-  // Using DEPT_MANUFACTURING database (DB2)
   const {
-    date_part,
-    delivery_note,
-    purchase_order,
     name_part,
     type_part,
     maker_part,
     qty_part,
+    information_part,
+    // Additional fields that might be required by the database
+    date_part,
+    delivery_note,
+    purchase_order,
     unit_part,
     recipient_part,
-    information_part,
     pic_part,
   } = data;
 
+  // Basic validation
+  if (!name_part || qty_part === undefined) {
+    throw new Error("Name and Quantity are required.");
+  }
+
   try {
+    const currentDate = new Date().toISOString().split("T")[0];
+
     await sql.query`
-      INSERT INTO inventory_parts (
+      INSERT INTO INVENTORY_PARTS (
         date_part, 
         delivery_note, 
         purchase_order, 
@@ -37,17 +40,17 @@ const createInventoryItem = async (data) => {
         information_part, 
         pic_part
       ) VALUES (
-        ${date_part}, 
-        ${delivery_note}, 
-        ${purchase_order}, 
+        ${date_part || currentDate}, 
+        ${delivery_note || null}, 
+        ${purchase_order || null}, 
         ${name_part}, 
-        ${type_part}, 
-        ${maker_part}, 
+        ${type_part || null}, 
+        ${maker_part || null}, 
         ${qty_part}, 
-        ${unit_part}, 
-        ${recipient_part}, 
-        ${information_part}, 
-        ${pic_part}
+        ${unit_part || null}, 
+        ${recipient_part || null}, 
+        ${information_part || null}, 
+        ${pic_part || null}
       )`;
     return { message: "Item created successfully" };
   } catch (error) {
@@ -56,10 +59,20 @@ const createInventoryItem = async (data) => {
   }
 };
 
-// Fungsi untuk mendapatkan semua item inventaris
+// Function to get all inventory items with selected fields
 const getInventoryItems = async () => {
   try {
-    const result = await sql.query`SELECT * FROM inventory_parts`;
+    const result = await sql.query`
+      SELECT 
+        no_part, 
+        name_part, 
+        type_part, 
+        maker_part, 
+        qty_part, 
+        information_part 
+      FROM INVENTORY_PARTS
+      ORDER BY no_part DESC
+    `;
     return result.recordset;
   } catch (error) {
     console.error("Error fetching inventory items:", error.message);
@@ -67,49 +80,82 @@ const getInventoryItems = async () => {
   }
 };
 
-// Fungsi untuk memperbarui item inventaris
-const updateInventoryItem = async (no_part, data) => {
+// Function to get a single inventory item by ID
+const getInventoryItemById = async (id) => {
+  try {
+    const result = await sql.query`
+      SELECT 
+        no_part, 
+        name_part, 
+        type_part, 
+        maker_part, 
+        qty_part, 
+        information_part 
+      FROM INVENTORY_PARTS 
+      WHERE no_part = ${id}
+    `;
+
+    if (result.recordset.length === 0) {
+      throw new Error("Item not found");
+    }
+
+    return result.recordset[0];
+  } catch (error) {
+    console.error("Error fetching inventory item:", error.message);
+    throw error;
+  }
+};
+
+// Function to update an inventory item
+const updateInventoryItem = async (id, data) => {
   const {
-    date_part,
-    delivery_note,
-    purchase_order,
     name_part,
     type_part,
     maker_part,
     qty_part,
+    information_part,
+    // Additional fields
+    date_part,
+    delivery_note,
+    purchase_order,
     unit_part,
     recipient_part,
-    information_part,
     pic_part,
   } = data;
 
-  // Validasi input
+  // Validate input
   if (!name_part || qty_part === undefined) {
     throw new Error("Name and Quantity are required.");
   }
 
-  const checkItem =
-    await sql.query`SELECT * FROM inventory_parts WHERE no_part = ${no_part}`;
-  if (checkItem.recordset.length === 0) {
-    throw new Error("Item not found");
-  }
-
   try {
+    // Check if item exists
+    const checkItem = await sql.query`
+      SELECT no_part FROM INVENTORY_PARTS WHERE no_part = ${id}
+    `;
+
+    if (checkItem.recordset.length === 0) {
+      throw new Error("Item not found");
+    }
+
+    const currentDate = new Date().toISOString().split("T")[0];
+
     await sql.query`
-      UPDATE inventory_parts 
+      UPDATE INVENTORY_PARTS 
       SET 
-        date_part = ${date_part}, 
-        delivery_note = ${delivery_note}, 
-        purchase_order = ${purchase_order}, 
+        date_part = ${date_part || currentDate}, 
+        delivery_note = ${delivery_note || null}, 
+        purchase_order = ${purchase_order || null}, 
         name_part = ${name_part}, 
-        type_part = ${type_part}, 
-        maker_part = ${maker_part}, 
+        type_part = ${type_part || null}, 
+        maker_part = ${maker_part || null}, 
         qty_part = ${qty_part}, 
-        unit_part = ${unit_part}, 
-        recipient_part = ${recipient_part}, 
-        information_part = ${information_part}, 
-        pic_part = ${pic_part}
-      WHERE no_part = ${no_part}`;
+        unit_part = ${unit_part || null}, 
+        recipient_part = ${recipient_part || null}, 
+        information_part = ${information_part || null}, 
+        pic_part = ${pic_part || null}
+      WHERE no_part = ${id}
+    `;
     return { message: "Item updated successfully" };
   } catch (error) {
     console.error("Error updating inventory item:", error.message);
@@ -117,17 +163,21 @@ const updateInventoryItem = async (no_part, data) => {
   }
 };
 
-// Fungsi untuk menghapus item inventaris
-const deleteInventoryItem = async (no_part) => {
-  // Cek apakah item ada
-  const checkItem =
-    await sql.query`SELECT * FROM inventory_parts WHERE no_part = ${no_part}`;
-  if (checkItem.recordset.length === 0) {
-    throw new Error("Item not found");
-  }
-
+// Function to delete an inventory item
+const deleteInventoryItem = async (id) => {
   try {
-    await sql.query`DELETE FROM inventory_parts WHERE no_part = ${no_part}`;
+    // Check if item exists
+    const checkItem = await sql.query`
+      SELECT no_part FROM INVENTORY_PARTS WHERE no_part = ${id}
+    `;
+
+    if (checkItem.recordset.length === 0) {
+      throw new Error("Item not found");
+    }
+
+    await sql.query`
+      DELETE FROM INVENTORY_PARTS WHERE no_part = ${id}
+    `;
     return { message: "Item deleted successfully" };
   } catch (error) {
     console.error("Error deleting inventory item:", error.message);
@@ -135,10 +185,10 @@ const deleteInventoryItem = async (no_part) => {
   }
 };
 
-// Ekspor fungsi
 module.exports = {
   createInventoryItem,
   getInventoryItems,
+  getInventoryItemById,
   updateInventoryItem,
   deleteInventoryItem,
 };

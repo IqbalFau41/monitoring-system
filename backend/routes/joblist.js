@@ -99,7 +99,32 @@ router.post("/", async (req, res) => {
     request.input("job_class", JOB_CLASS || null);
     request.input("job_desc", JOB_DESC || null);
     request.input("factory", FACTORY || null);
-    request.input("due_date", DUE_DATE || null);
+
+    // Fix date handling
+    if (DUE_DATE) {
+      try {
+        // If DUE_DATE is already a Date object
+        if (DUE_DATE instanceof Date) {
+          request.input("due_date", DUE_DATE);
+        } else {
+          // Try to parse the date string
+          const parsedDate = new Date(DUE_DATE);
+
+          // Check if the date is valid
+          if (!isNaN(parsedDate.getTime())) {
+            request.input("due_date", parsedDate);
+          } else {
+            request.input("due_date", null);
+          }
+        }
+      } catch (e) {
+        console.error("Date parsing error:", e);
+        request.input("due_date", null);
+      }
+    } else {
+      request.input("due_date", null);
+    }
+
     request.input("status", STATUS || null);
 
     await request.query(`
@@ -167,7 +192,32 @@ router.put("/:NRP", async (req, res) => {
     updateRequest.input("job_class", JOB_CLASS || null);
     updateRequest.input("job_desc", JOB_DESC || null);
     updateRequest.input("factory", FACTORY || null);
-    updateRequest.input("due_date", DUE_DATE || null);
+
+    // Fix date handling
+    if (DUE_DATE) {
+      try {
+        // If DUE_DATE is already a Date object
+        if (DUE_DATE instanceof Date) {
+          updateRequest.input("due_date", DUE_DATE);
+        } else {
+          // Try to parse the date string
+          const parsedDate = new Date(DUE_DATE);
+
+          // Check if the date is valid
+          if (!isNaN(parsedDate.getTime())) {
+            updateRequest.input("due_date", parsedDate);
+          } else {
+            updateRequest.input("due_date", null);
+          }
+        }
+      } catch (e) {
+        console.error("Date parsing error:", e);
+        updateRequest.input("due_date", null);
+      }
+    } else {
+      updateRequest.input("due_date", null);
+    }
+
     updateRequest.input("status", STATUS || null);
 
     await updateRequest.query(`
@@ -193,7 +243,7 @@ router.put("/:NRP", async (req, res) => {
   }
 });
 
-// Delete job list item
+// DELETE job list item
 router.delete("/:NRP", async (req, res) => {
   const { NRP } = req.params;
 
@@ -216,7 +266,7 @@ router.delete("/:NRP", async (req, res) => {
       return res.status(404).json({ error: "Item not found" });
     }
 
-    // Delete item
+    // Delete the item
     const deleteRequest = deptMfg.request();
     deleteRequest.input("nrp", NRP);
 

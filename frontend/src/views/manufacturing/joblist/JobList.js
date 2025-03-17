@@ -8,26 +8,28 @@ import {
   CSpinner,
   CPagination,
   CPaginationItem,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
   CTable,
   CTableBody,
   CTableRow,
   CTableDataCell,
   CButton,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
   CFormInput,
+  CFormSelect,
   CAlert,
 } from '@coreui/react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
-import { cilPen, cilCheck, cilSearch } from '@coreui/icons'
+import { cilPen, cilCheck, cilSearch, cilPlus } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 import '../../../scss/inventoryConfig.scss'
 
 const JobList = () => {
+  // State declarations
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -38,10 +40,22 @@ const JobList = () => {
   const [itemsPerPage] = useState(50)
   const [completeItem, setCompleteItem] = useState(null)
   const [completingJob, setCompletingJob] = useState(false)
-  const [updateItem, setUpdateItem] = useState(null) // State for update modal
-  const [updatingJob, setUpdatingJob] = useState(false) // State for updating job
+  const [updateItem, setUpdateItem] = useState(null)
+  const [updatingJob, setUpdatingJob] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newJob, setNewJob] = useState({
+    NRP: '',
+    NAME: '',
+    JOB_CLASS: '',
+    JOB_DESC: '',
+    FACTORY: '',
+    DUE_DATE: '',
+    STATUS: 'PENDING',
+  })
+  const [addingJob, setAddingJob] = useState(false)
   const navigate = useNavigate()
 
+  // Data fetching function
   const fetchJobs = async () => {
     setLoading(true)
     try {
@@ -60,8 +74,39 @@ const JobList = () => {
     fetchJobs()
   }, [])
 
+  // Handle Add Job
+  const handleAddJob = async () => {
+    setAddingJob(true)
+    try {
+      await axios.post('http://localhost:3001/api/job-list', newJob)
+      setSuccessMessage(`Pekerjaan baru untuk ${newJob.NAME} berhasil ditambahkan`)
+      setShowAddModal(false)
+      setNewJob({
+        NRP: '',
+        NAME: '',
+        JOB_CLASS: '',
+        JOB_DESC: '',
+        FACTORY: '',
+        DUE_DATE: '',
+        STATUS: 'PENDING',
+      })
+      fetchJobs()
+      setTimeout(() => {
+        setSuccessMessage(null)
+      }, 3000)
+    } catch (error) {
+      console.error('Error adding job:', error.response?.data || error.message)
+      setError(
+        `Gagal menambahkan pekerjaan: ${error.response?.data?.error || error.message}. Silakan coba lagi nanti.`,
+      )
+    } finally {
+      setAddingJob(false)
+    }
+  }
+
+  // Action handlers
   const handleUpdate = (job) => {
-    setUpdateItem(job) // Set the job to be updated
+    setUpdateItem(job)
   }
 
   const handleSort = (column) => {
@@ -74,7 +119,9 @@ const JobList = () => {
 
     setCompletingJob(true)
     try {
-      const response = await axios.post(`http://localhost:3001/api/job-history/move-to-history/${completeItem.NRP}`)
+      const response = await axios.post(
+        `http://localhost:3001/api/job-history/move-to-history/${completeItem.NRP}`,
+      )
       setSuccessMessage(`Pekerjaan ${completeItem.NAME} telah berhasil diselesaikan`)
       fetchJobs()
       setCompleteItem(null)
@@ -84,7 +131,9 @@ const JobList = () => {
       }, 3000)
     } catch (error) {
       console.error('Error completing job:', error.response?.data || error.message)
-      setError(`Gagal menyelesaikan pekerjaan: ${error.response?.data?.error || error.message}. Silakan coba lagi nanti.`)
+      setError(
+        `Gagal menyelesaikan pekerjaan: ${error.response?.data?.error || error.message}. Silakan coba lagi nanti.`,
+      )
     } finally {
       setCompletingJob(false)
     }
@@ -95,7 +144,10 @@ const JobList = () => {
 
     setUpdatingJob(true)
     try {
-      const response = await axios.put(`http://localhost:3001/api/job-list/${updateItem.NRP}`, updateItem)
+      const response = await axios.put(
+        `http://localhost:3001/api/job-list/${updateItem.NRP}`,
+        updateItem,
+      )
       setSuccessMessage(`Pekerjaan ${updateItem.NAME} telah berhasil diperbarui`)
       fetchJobs()
       setUpdateItem(null)
@@ -105,11 +157,15 @@ const JobList = () => {
       }, 3000)
     } catch (error) {
       console.error('Error updating job:', error.response?.data || error.message)
-      setError(`Gagal memperbarui pekerjaan: ${error.response?.data?.error || error.message}. Silakan coba lagi nanti.`)
+      setError(
+        `Gagal memperbarui pekerjaan: ${error.response?.data?.error || error.message}. Silakan coba lagi nanti.`,
+      )
     } finally {
       setUpdatingJob(false)
     }
   }
+
+  // Format date for display
   const formatDate = (date) => {
     if (!date) return '-'
     return new Date(date).toLocaleDateString('id-ID', {
@@ -119,14 +175,15 @@ const JobList = () => {
     })
   }
 
+  // Data processing logic
   const sortedAndFilteredJobs = React.useMemo(() => {
     const filtered = jobs.filter((item) =>
       Object.values(item).some(
-        value =>
+        (value) =>
           value &&
           typeof value === 'string' &&
-          value.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+          value.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
     )
 
     return [...filtered].sort((a, b) => {
@@ -141,15 +198,18 @@ const JobList = () => {
     })
   }, [jobs, searchTerm, sortOrder])
 
+  // Calculate pagination
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
   const currentItems = sortedAndFilteredJobs.slice(indexOfFirstItem, indexOfLastItem)
   const totalPages = Math.ceil(sortedAndFilteredJobs.length / itemsPerPage)
 
+  // Pagination handler
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber)
   }
 
+  // Loading spinner display
   if (loading) {
     return (
       <div className="spinner-container">
@@ -158,6 +218,7 @@ const JobList = () => {
     )
   }
 
+  // Table header component for better organization
   const TableHeader = ({ column, children }) => (
     <div className="fixed-header-cell" onClick={() => handleSort(column)}>
       {children}
@@ -167,10 +228,15 @@ const JobList = () => {
     </div>
   )
 
+  // Main component render
   return (
     <CRow className="job-list-page">
       <CCol xs={12}>
-        {error && <CAlert color="danger" dismissible onClose={() => setError(null)}>{error}</CAlert>}
+        {error && (
+          <CAlert color="danger" dismissible onClose={() => setError(null)}>
+            {error}
+          </CAlert>
+        )}
         {successMessage && (
           <CAlert color="success" dismissible onClose={() => setSuccessMessage(null)}>
             {successMessage}
@@ -178,7 +244,7 @@ const JobList = () => {
         )}
 
         <CCard className="mb-4">
-          <CCardHeader className="d-flex justify-content-between align-items-center">
+          <CCardHeader className="d-flex justify-content-between align-items-center flex-wrap">
             <strong>Daftar Pekerjaan Karyawan</strong>
             <div className="search-container">
               <CFormInput
@@ -186,20 +252,23 @@ const JobList = () => {
                 placeholder="Cari berdasarkan nama atau deskripsi..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
+                className="mb-2"
                 startContent={<CIcon icon={cilSearch} />}
               />
             </div>
           </CCardHeader>
 
           <CCardBody>
+            <CButton color="primary" onClick={() => setShowAddModal(true)}>
+              <CIcon icon={cilPlus} className="me-1" /> Tambah Pekerjaan
+            </CButton>
             <div className="fixed-header">
               <TableHeader column="NRP">NRP</TableHeader>
               <TableHeader column="NAME">Nama</TableHeader>
               <TableHeader column="JOB_CLASS">Job Class</TableHeader>
               <TableHeader column="JOB_DESC">Deskripsi Pekerjaan</TableHeader>
-              <TableHeader column="FACTORY">Pabrik</TableHeader>
-              <TableHeader column="DUE_DATE">Tanggal Jatuh Tempo</TableHeader>
+              <TableHeader column="FACTORY">Factory</TableHeader>
+              <TableHeader column="DUE_DATE">Tenggat</TableHeader>
               <TableHeader column="STATUS">Status</TableHeader>
               <TableHeader column="created_at">Dibuat Pada</TableHeader>
               <div className="fixed-header-cell">Aksi</div>
@@ -224,23 +293,24 @@ const JobList = () => {
                         </CTableDataCell>
                         <CTableDataCell>{formatDate(job.created_at)}</CTableDataCell>
                         <CTableDataCell>
-                          <CButton
-                            color="warning"
-                            size="sm"
-                            className="me-2"
-                            onClick={() => handleUpdate(job)}
-                            title="Edit"
-                          >
-                            <CIcon icon={cilPen} />
-                          </CButton>
-                          <CButton
-                            color="success"
-                            size="sm"
-                            onClick={() => setCompleteItem(job)}
-                            title="Selesai"
-                          >
-                            <CIcon icon={cilCheck} />
-                          </CButton>
+                          <div className="d-flex gap-1">
+                            <CButton
+                              color="warning"
+                              size="sm"
+                              onClick={() => handleUpdate(job)}
+                              title="Edit"
+                            >
+                              <CIcon icon={cilPen} />
+                            </CButton>
+                            <CButton
+                              color="success"
+                              size="sm"
+                              onClick={() => setCompleteItem(job)}
+                              title="Selesai"
+                            >
+                              <CIcon icon={cilCheck} />
+                            </CButton>
+                          </div>
                         </CTableDataCell>
                       </CTableRow>
                     ))
@@ -283,6 +353,84 @@ const JobList = () => {
           </CCardBody>
         </CCard>
 
+        {/* Modal for adding new job - was missing in the original code */}
+        <CModal visible={showAddModal} onClose={() => setShowAddModal(false)}>
+          <CModalHeader>
+            <CModalTitle>Tambah Pekerjaan Baru</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <CFormInput
+              label="NRP"
+              value={newJob.NRP}
+              onChange={(e) => setNewJob({ ...newJob, NRP: e.target.value })}
+              className="mb-3"
+              required
+            />
+            <CFormInput
+              label="Nama"
+              value={newJob.NAME}
+              onChange={(e) => setNewJob({ ...newJob, NAME: e.target.value })}
+              className="mb-3"
+              required
+            />
+            <CFormInput
+              label="Job Class"
+              value={newJob.JOB_CLASS}
+              onChange={(e) => setNewJob({ ...newJob, JOB_CLASS: e.target.value })}
+              className="mb-3"
+              required
+            />
+            <CFormInput
+              label="Deskripsi Pekerjaan"
+              value={newJob.JOB_DESC}
+              onChange={(e) => setNewJob({ ...newJob, JOB_DESC: e.target.value })}
+              className="mb-3"
+              required
+            />
+            <CFormInput
+              label="Pabrik"
+              value={newJob.FACTORY}
+              onChange={(e) => setNewJob({ ...newJob, FACTORY: e.target.value })}
+              className="mb-3"
+              required
+            />
+            <CFormInput
+              label="Tanggal Jatuh Tempo"
+              type="date"
+              value={newJob.DUE_DATE}
+              onChange={(e) => setNewJob({ ...newJob, DUE_DATE: e.target.value })}
+              className="mb-3"
+              required
+            />
+            <CFormSelect
+              label="Status"
+              value={newJob.STATUS}
+              onChange={(e) => setNewJob({ ...newJob, STATUS: e.target.value })}
+              options={[
+                { label: 'PENDING', value: 'PENDING' },
+                { label: 'IN PROGRESS', value: 'IN PROGRESS' },
+                { label: 'COMPLETED', value: 'COMPLETED' },
+              ]}
+              className="mb-3"
+            />
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => setShowAddModal(false)}>
+              Batal
+            </CButton>
+            <CButton color="primary" onClick={handleAddJob} disabled={addingJob}>
+              {addingJob ? (
+                <>
+                  <CSpinner size="sm" color="light" className="me-1" />
+                  Menyimpan...
+                </>
+              ) : (
+                'Simpan'
+              )}
+            </CButton>
+          </CModalFooter>
+        </CModal>
+
         {/* Modal for completing job */}
         <CModal visible={!!completeItem} onClose={() => setCompleteItem(null)}>
           <CModalHeader>
@@ -301,11 +449,7 @@ const JobList = () => {
             <CButton color="secondary" onClick={() => setCompleteItem(null)}>
               Batal
             </CButton>
-            <CButton
-              color="success"
-              onClick={handleComplete}
-              disabled={completingJob}
-            >
+            <CButton color="success" onClick={handleComplete} disabled={completingJob}>
               {completingJob ? (
                 <>
                   <CSpinner size="sm" color="light" className="me-1" />
@@ -324,42 +468,56 @@ const JobList = () => {
             <CModalTitle>Perbarui Pekerjaan</CModalTitle>
           </CModalHeader>
           <CModalBody>
+            <CFormInput label="NRP" value={updateItem?.NRP || ''} disabled className="mb-3" />
             <CFormInput
               label="Nama"
               value={updateItem?.NAME || ''}
               onChange={(e) => setUpdateItem({ ...updateItem, NAME: e.target.value })}
+              className="mb-3"
             />
             <CFormInput
               label="Deskripsi Pekerjaan"
               value={updateItem?.JOB_DESC || ''}
               onChange={(e) => setUpdateItem({ ...updateItem, JOB_DESC: e.target.value })}
+              className="mb-3"
             />
             <CFormInput
               label="Job Class"
               value={updateItem?.JOB_CLASS || ''}
               onChange={(e) => setUpdateItem({ ...updateItem, JOB_CLASS: e.target.value })}
+              className="mb-3"
             />
             <CFormInput
               label="Pabrik"
               value={updateItem?.FACTORY || ''}
               onChange={(e) => setUpdateItem({ ...updateItem, FACTORY: e.target.value })}
+              className="mb-3"
             />
             <CFormInput
               label="Tanggal Jatuh Tempo"
               type="date"
               value={updateItem?.DUE_DATE?.split('T')[0] || ''}
               onChange={(e) => setUpdateItem({ ...updateItem, DUE_DATE: e.target.value })}
+              className="mb-3"
+            />
+            <CFormSelect
+              label="Status"
+              value={updateItem?.STATUS || ''}
+              onChange={(e) => setUpdateItem({ ...updateItem, STATUS: e.target.value })}
+              options={[
+                { label: 'Pilih Status', value: '' },
+                { label: 'PENDING', value: 'PENDING' },
+                { label: 'IN PROGRESS', value: 'IN PROGRESS' },
+                { label: 'COMPLETED', value: 'COMPLETED' },
+              ]}
+              className="mb-3"
             />
           </CModalBody>
           <CModalFooter>
             <CButton color="secondary" onClick={() => setUpdateItem(null)}>
               Batal
             </CButton>
-            <CButton
-              color="primary"
-              onClick={handleUpdateJob}
-              disabled={updatingJob}
-            >
+            <CButton color="primary" onClick={handleUpdateJob} disabled={updatingJob}>
               {updatingJob ? (
                 <>
                   <CSpinner size="sm" color="light" className="me-1" />

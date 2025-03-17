@@ -37,7 +37,7 @@ const startServer = async () => {
     // const userRouter = require("./routes/users"); // Menggunakan DB1 (IOT_HUB)
 
     // Routes using DEPT_MANUFACTURING (DB2)
-    const inventoryRouter = require("./routes/inventory"); // DB2: DEPT_MANUFACTURING - inventory_parts
+    const inventoryRouter = require("./routes/inventory"); // DB2: DEPT_MANUFACTURING - INVENTORY_PARTS
     const authRouter = require("./routes/auth"); // DB2: DEPT_MANUFACTURING - USER_NAME
     const jobListRouter = require("./routes/joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST
     const historyJobListRouter = require("./routes/history_joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST_HISTORY

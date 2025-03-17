@@ -160,7 +160,7 @@ const JobHistory = () => {
 
   // Main component render
   return (
-    <CRow className="job-list-page">
+    <CRow className="job-history-list-page">
       <CCol xs={12}>
         {error && (
           <CAlert color="danger" dismissible onClose={() => setError(null)}>
@@ -182,7 +182,7 @@ const JobHistory = () => {
                 placeholder="Cari berdasarkan nama atau deskripsi..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
+                className="mb-2"
                 startContent={<CIcon icon={cilSearch} />}
               />
             </div>
@@ -193,8 +193,8 @@ const JobHistory = () => {
               <TableHeader column="NAME">Nama</TableHeader>
               <TableHeader column="JOB_CLASS">Job Class</TableHeader>
               <TableHeader column="JOB_DESC">Deskripsi Pekerjaan</TableHeader>
-              <TableHeader column="FACTORY">Pabrik</TableHeader>
-              <TableHeader column="DUE_DATE">Tanggal Jatuh Tempo</TableHeader>
+              <TableHeader column="FACTORY">Lokasi</TableHeader>
+              <TableHeader column="DUE_DATE">Tenggat</TableHeader>
               <TableHeader column="STATUS">Status</TableHeader>
               <TableHeader column="COMPLETION_DATE">Tanggal Selesai</TableHeader>
               <TableHeader column="ORIGINAL_CREATED_AT">Tanggal Dibuat</TableHeader>
