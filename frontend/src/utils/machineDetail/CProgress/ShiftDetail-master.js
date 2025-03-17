@@ -41,6 +41,20 @@ const ShiftDetail = ({ shifts }) => {
     return currentTime.getHours()
   }
 
+  // Get current minute for display
+  const getCurrentMinute = () => {
+    return currentTime.getMinutes()
+  }
+
+  // Check if shift has started based on current time
+  const hasShiftStarted = (shiftStartHour) => {
+    const currentHour = getCurrentHour()
+    const currentMinute = getCurrentMinute()
+    const startHour = parseInt(shiftStartHour.split(':')[0], 10)
+
+    return currentHour > startHour || (currentHour === startHour && currentMinute >= 0)
+  }
+
   // Determine if current time is within production hours (starting at 7 AM)
   const isWithinProductionHours = () => {
     const currentHour = currentTime.getHours()
@@ -76,14 +90,50 @@ const ShiftDetail = ({ shifts }) => {
     }
   }
 
+  // Function to find the latest data point before the shift starts
+  const findLatestDataBeforeShift = (allData, shiftStartHour) => {
+    if (!allData || allData.length === 0) return null
+
+    // Convert shift start to decimal hours
+    const shiftStart = parseInt(shiftStartHour.split(':')[0], 10)
+
+    // Sort all data by timestamp (ascending)
+    const sortedData = [...allData].sort(
+      (a, b) => new Date(a.CreatedAt).getTime() - new Date(b.CreatedAt).getTime(),
+    )
+
+    // Find the latest record before shift start
+    let latestBeforeShift = null
+
+    for (const record of sortedData) {
+      const recordTime = new Date(record.CreatedAt)
+
+      // Skip records with timestamps in the future
+      if (recordTime > currentTime) continue
+
+      const recordHour = recordTime.getHours()
+      const recordMinute = recordTime.getMinutes()
+      const recordDecimalTime = recordHour + recordMinute / 60
+
+      // If this record is after shift start, stop looking
+      if (recordHour >= shiftStart && recordHour < (shiftStart === 23 ? 0 : shiftStart + 1)) {
+        break
+      }
+
+      latestBeforeShift = record
+    }
+
+    return latestBeforeShift
+  }
+
   // Function to calculate hourly production values
   const calculateHourlyProduction = (data, shiftHours) => {
     if (!data || data.length === 0) return Array(shiftHours.length).fill(0)
 
-    // Sort data by timestamp
-    const sortedData = [...data].sort(
-      (a, b) => new Date(a.CreatedAt).getTime() - new Date(b.CreatedAt).getTime(),
-    )
+    // Sort data by timestamp and filter out future data
+    const sortedData = [...data]
+      .filter((record) => new Date(record.CreatedAt) <= currentTime)
+      .sort((a, b) => new Date(a.CreatedAt).getTime() - new Date(b.CreatedAt).getTime())
 
     // Initialize hourly counters
     const hourlyProduction = Array(shiftHours.length).fill(0)
@@ -159,6 +209,20 @@ const ShiftDetail = ({ shifts }) => {
     return hourlyProduction
   }
 
+  // Function to get all data points across all shifts
+  const getAllData = (shifts) => {
+    let allData = []
+    shifts.forEach((shift) => {
+      if (shift.data && shift.data.length > 0) {
+        allData = [...allData, ...shift.data]
+      }
+    })
+    return allData
+  }
+
+  // Get all data across shifts
+  const allShiftData = getAllData(shifts)
+
   return (
     <>
       <h2>Detail Production</h2>
@@ -182,15 +246,26 @@ const ShiftDetail = ({ shifts }) => {
         const startHourNum = parseInt(shiftStartHour.split(':')[0], 10)
         const endHourNum = parseInt(shiftEndHour.split(':')[0], 10)
 
+        // Check if this shift has started yet
+        const shiftHasStarted = hasShiftStarted(shiftStartHour)
+
+        // If shift hasn't started yet, don't render it
+        if (!shiftHasStarted) {
+          return null
+        }
+
         // Determine if current time falls within this shift
         const currentHour = getCurrentHour()
-        const currentMinute = currentTime.getMinutes()
+        const currentMinute = getCurrentMinute()
         const isActiveShift = isTimeInShift(
           currentHour,
           currentMinute,
           shiftStartHour,
           shiftEndHour,
         )
+
+        // Find the latest data before this shift starts
+        const latestBeforeShift = findLatestDataBeforeShift(allShiftData, shiftStartHour)
 
         // Calculate hourly production values
         const hourlyProduction = calculateHourlyProduction(shift.data, shiftHours)
@@ -199,10 +274,10 @@ const ShiftDetail = ({ shifts }) => {
         let statusSegments = []
 
         if (shift.data && shift.data.length > 0) {
-          // Sort data by timestamp
-          const sortedData = [...shift.data].sort(
-            (a, b) => new Date(a.CreatedAt).getTime() - new Date(b.CreatedAt).getTime(),
-          )
+          // Sort data by timestamp and filter out future data
+          const sortedData = [...shift.data]
+            .filter((record) => new Date(record.CreatedAt) <= currentTime)
+            .sort((a, b) => new Date(a.CreatedAt).getTime() - new Date(b.CreatedAt).getTime())
 
           // Find relevant records for this shift
           const shiftRecords = sortedData.filter((record) => {
@@ -213,13 +288,56 @@ const ShiftDetail = ({ shifts }) => {
             return isTimeInShift(recordHour, recordMinute, shiftStartHour, shiftEndHour)
           })
 
-          if (shiftRecords.length > 0) {
+          // Create a combined data array that might include the data point from before shift start
+          let combinedRecords = [...shiftRecords]
+
+          // If we have the last record before shift and we have shift records
+          if (latestBeforeShift && shiftRecords.length > 0) {
+            // Check if there's a gap between shift start and first record in shift
+            const firstShiftRecord = shiftRecords[0]
+            const firstRecordTime = new Date(firstShiftRecord.CreatedAt)
+            const shiftStartTime = new Date(firstRecordTime)
+
+            // Set to shift start time
+            shiftStartTime.setHours(startHourNum)
+            shiftStartTime.setMinutes(0)
+            shiftStartTime.setSeconds(0)
+
+            // If the first record is after shift start time, fill gap with the latest before shift
+            if (firstRecordTime > shiftStartTime) {
+              // Create a copy of the latest before shift record but with shift start time
+              const fillerRecord = {
+                ...latestBeforeShift,
+                CreatedAt: shiftStartTime.toISOString(),
+              }
+
+              // Insert at the beginning
+              combinedRecords = [fillerRecord, ...shiftRecords]
+            }
+          }
+          // If we have the last record before shift but no shift records, and it's active shift
+          else if (latestBeforeShift && shiftRecords.length === 0 && isActiveShift) {
+            // Create a record with shift start time
+            const shiftStartTime = new Date()
+            shiftStartTime.setHours(startHourNum)
+            shiftStartTime.setMinutes(0)
+            shiftStartTime.setSeconds(0)
+
+            const fillerRecord = {
+              ...latestBeforeShift,
+              CreatedAt: shiftStartTime.toISOString(),
+            }
+
+            combinedRecords = [fillerRecord]
+          }
+
+          if (combinedRecords.length > 0) {
             // Get the timestamp of the last record
-            const lastRecordTime = new Date(shiftRecords[shiftRecords.length - 1].CreatedAt)
+            const lastRecordTime = new Date(combinedRecords[combinedRecords.length - 1].CreatedAt)
 
             // Process data to create continuous segments
-            for (let i = 0; i < shiftRecords.length; i++) {
-              const record = shiftRecords[i]
+            for (let i = 0; i < combinedRecords.length; i++) {
+              const record = combinedRecords[i]
               const recordTime = new Date(record.CreatedAt)
               const recordHour = recordTime.getHours()
               const recordMinute = recordTime.getMinutes()
@@ -235,9 +353,9 @@ const ShiftDetail = ({ shifts }) => {
 
               // Calculate end position based on next record or current time
               let endPosition
-              if (i < shiftRecords.length - 1) {
+              if (i < combinedRecords.length - 1) {
                 // If there's a next record, use its time
-                const nextRecord = shiftRecords[i + 1]
+                const nextRecord = combinedRecords[i + 1]
                 const nextTime = new Date(nextRecord.CreatedAt)
                 const nextHour = nextTime.getHours()
                 const nextMinute = nextTime.getMinutes()
@@ -250,7 +368,7 @@ const ShiftDetail = ({ shifts }) => {
                   shiftHours.length,
                 )
               } else {
-                // For the last record, extend only up to current time if it's active shift
+                // For the last record, extend up to current time if it's active shift
                 if (isActiveShift) {
                   // Don't go beyond current time
                   const currentTimePosition = calculateTimePosition(
@@ -263,14 +381,23 @@ const ShiftDetail = ({ shifts }) => {
 
                   endPosition = currentTimePosition
                 } else {
-                  // For completed shifts or inactive shifts, show up to last data point only
-                  endPosition = calculateTimePosition(
-                    lastRecordTime.getHours(),
-                    lastRecordTime.getMinutes(),
+                  // For completed shifts, extend to the end of the shift
+                  // But not beyond current time if current time is within this shift
+                  const shiftEndPosition = 100
+                  const currentTimePosition = calculateTimePosition(
+                    currentHour,
+                    currentMinute,
                     startHourNum,
                     endHourNum,
                     shiftHours.length,
                   )
+
+                  // If current time is within this shift's hours
+                  if (isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)) {
+                    endPosition = currentTimePosition
+                  } else {
+                    endPosition = shiftEndPosition
+                  }
                 }
               }
 
@@ -292,7 +419,70 @@ const ShiftDetail = ({ shifts }) => {
             const totalWidth = statusSegments.reduce((sum, segment) => sum + segment.width, 0)
 
             // If we haven't reached 100%, add empty space, but only up to current time for active shifts
-            if (totalWidth < 100 && isActiveShift) {
+            if (totalWidth < 100) {
+              if (isActiveShift) {
+                const currentTimePosition = calculateTimePosition(
+                  currentHour,
+                  currentMinute,
+                  startHourNum,
+                  endHourNum,
+                  shiftHours.length,
+                )
+
+                // Only add empty space up to current time position if it's greater than total width
+                if (currentTimePosition > totalWidth) {
+                  statusSegments.push({
+                    start: totalWidth,
+                    end: currentTimePosition,
+                    width: currentTimePosition - totalWidth,
+                    operationType:
+                      statusSegments.length > 0
+                        ? statusSegments[statusSegments.length - 1].operationType
+                        : '',
+                    counter: 0,
+                    color:
+                      statusSegments.length > 0
+                        ? statusSegments[statusSegments.length - 1].color
+                        : 'secondary',
+                  })
+                }
+              } else {
+                // For inactive shifts, fill to the end with the last known status
+                // But not beyond current time if the shift hasn't completed yet
+                let endPosition = 100
+
+                // If current time is within this shift's hours
+                if (isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)) {
+                  const currentTimePosition = calculateTimePosition(
+                    currentHour,
+                    currentMinute,
+                    startHourNum,
+                    endHourNum,
+                    shiftHours.length,
+                  )
+                  endPosition = currentTimePosition
+                }
+
+                statusSegments.push({
+                  start: totalWidth,
+                  end: endPosition,
+                  width: endPosition - totalWidth,
+                  operationType:
+                    statusSegments.length > 0
+                      ? statusSegments[statusSegments.length - 1].operationType
+                      : '',
+                  counter: 0,
+                  color:
+                    statusSegments.length > 0
+                      ? statusSegments[statusSegments.length - 1].color
+                      : 'secondary',
+                })
+              }
+            }
+          } else {
+            // No records in this shift but we have data from before shift
+            if (latestBeforeShift) {
+              // Calculate the current time position
               const currentTimePosition = calculateTimePosition(
                 currentHour,
                 currentMinute,
@@ -301,42 +491,145 @@ const ShiftDetail = ({ shifts }) => {
                 shiftHours.length,
               )
 
-              // Add "empty" segment from last record to current time
+              // Fill from shift start to current time (or shift end if completed)
+              const endPosition = isActiveShift
+                ? currentTimePosition
+                : isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+                  ? currentTimePosition
+                  : 100
+
+              // Only create a segment if there's width
+              if (endPosition > 0) {
+                statusSegments.push({
+                  start: 0,
+                  end: endPosition,
+                  width: endPosition,
+                  operationType: latestBeforeShift.OPERATION_NAME || '',
+                  counter: latestBeforeShift.MACHINE_COUNTER || 0,
+                  color: getOperationColor(latestBeforeShift.OPERATION_NAME),
+                })
+              }
+
+              // If we haven't reached the end of the shift and it's not an active shift
+              if (endPosition < 100 && !isActiveShift) {
+                statusSegments.push({
+                  start: endPosition,
+                  end: 100,
+                  width: 100 - endPosition,
+                  operationType: '',
+                  counter: 0,
+                  color: 'secondary',
+                })
+              }
+            } else {
+              // Calculate the current time position for display limit
+              const currentTimePosition =
+                isActiveShift ||
+                isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+                  ? calculateTimePosition(
+                      currentHour,
+                      currentMinute,
+                      startHourNum,
+                      endHourNum,
+                      shiftHours.length,
+                    )
+                  : 100
+
+              // Completely empty shift - create one segment indicating signal loss
               statusSegments.push({
-                start: totalWidth,
+                start: 0,
                 end: currentTimePosition,
-                width: currentTimePosition - totalWidth,
+                width: currentTimePosition,
+                operationType: 'SIGNAL LOSS',
+                counter: 0,
+                color: 'danger', // Using red to indicate signal loss
+              })
+
+              // If we haven't reached the end and it's not active
+              if (currentTimePosition < 100 && !isActiveShift) {
+                statusSegments.push({
+                  start: currentTimePosition,
+                  end: 100,
+                  width: 100 - currentTimePosition,
+                  operationType: '',
+                  counter: 0,
+                  color: 'secondary',
+                })
+              }
+            }
+          }
+        } else {
+          // No data for this shift but we have data from before shift
+          if (latestBeforeShift) {
+            // Calculate the current time position
+            const currentTimePosition = calculateTimePosition(
+              currentHour,
+              currentMinute,
+              startHourNum,
+              endHourNum,
+              shiftHours.length,
+            )
+
+            // Fill from shift start to current time (or shift end if completed)
+            const endPosition = isActiveShift
+              ? currentTimePosition
+              : isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+                ? currentTimePosition
+                : 100
+
+            // Only create a segment if there's width
+            if (endPosition > 0) {
+              statusSegments.push({
+                start: 0,
+                end: endPosition,
+                width: endPosition,
+                operationType: latestBeforeShift.OPERATION_NAME || '',
+                counter: latestBeforeShift.MACHINE_COUNTER || 0,
+                color: getOperationColor(latestBeforeShift.OPERATION_NAME),
+              })
+            }
+
+            // If we haven't reached the end of the shift and it's not an active shift
+            if (endPosition < 100 && !isActiveShift) {
+              statusSegments.push({
+                start: endPosition,
+                end: 100,
+                width: 100 - endPosition,
                 operationType: '',
                 counter: 0,
                 color: 'secondary',
               })
             }
           } else {
-            // If no records in this shift, check if it's the active shift
-            if (isActiveShift) {
-              // For active shift with no data, show progress up to current time
-              const currentTimePosition = calculateTimePosition(
-                currentHour,
-                currentMinute,
-                startHourNum,
-                endHourNum,
-                shiftHours.length,
-              )
+            // Calculate the current time position for display limit
+            const currentTimePosition =
+              isActiveShift ||
+              isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+                ? calculateTimePosition(
+                    currentHour,
+                    currentMinute,
+                    startHourNum,
+                    endHourNum,
+                    shiftHours.length,
+                  )
+                : 100
 
+            // Completely empty shift - create one segment indicating signal loss
+            statusSegments.push({
+              start: 0,
+              end: currentTimePosition,
+              width: currentTimePosition,
+              operationType: 'SIGNAL LOSS',
+              counter: 0,
+              color: 'danger', // Using red to indicate signal loss
+            })
+
+            // If we haven't reached the end and it's not active
+            if (currentTimePosition < 100 && !isActiveShift) {
               statusSegments.push({
-                start: 0,
-                end: currentTimePosition,
-                width: currentTimePosition,
-                operationType: '',
-                counter: 0,
-                color: 'secondary',
-              })
-            } else {
-              // For inactive shifts with no data, leave them empty
-              statusSegments.push({
-                start: 0,
-                end: 0,
-                width: 0,
+                start: currentTimePosition,
+                end: 100,
+                width: 100 - currentTimePosition,
                 operationType: '',
                 counter: 0,
                 color: 'secondary',
@@ -375,20 +668,6 @@ const ShiftDetail = ({ shifts }) => {
                       {statusSegments.map((segment, idx) => (
                         <CProgress key={idx} color={segment.color} value={segment.width} />
                       ))}
-
-                      {/* Fill any remaining space if status segments don't add up to 100% */}
-                      {statusSegments.length > 0 && (
-                        <CProgress
-                          color="secondary"
-                          value={Math.max(
-                            0,
-                            100 - statusSegments.reduce((total, seg) => total + seg.width, 0),
-                          )}
-                        />
-                      )}
-
-                      {/* If no data, show empty progress bar */}
-                      {statusSegments.length === 0 && <CProgress color="secondary" value={100} />}
 
                       {/* Time progress indicator as a separate overlay */}
                       {isWithinProductionHours() && isActiveShift && (

@@ -12,7 +12,10 @@ import {
   CBadge,
 } from '@coreui/react'
 import { Link } from 'react-router-dom'
-import { getStatusConfig, generateDefaultSignal } from '../../utils/signalLightConfig'
+import {
+  getStatusConfig,
+  generateDefaultSignal,
+} from '../../utils/signalLightConfig/signalLightConfig.js'
 import '../../scss/signalLightConfig.scss'
 
 const Karawang = () => {
