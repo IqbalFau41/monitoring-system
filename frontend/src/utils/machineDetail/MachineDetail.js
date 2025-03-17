@@ -13,10 +13,17 @@ import {
   CButton,
   CButtonGroup,
   CSpinner,
+  CToast,
+  CToastBody,
+  CToastHeader,
 } from '@coreui/react'
 import './machinedetail.css'
 import { chartOptions } from './dataMachine.js'
 import ShiftDetail from './CProgress/ShiftDetail.js'
+
+// Configuration for real-time updates
+const REALTIME_UPDATE_INTERVAL = 1000
+const ABNORMALITY_STATUSES = ['Warning', 'Error', 'Maintenance Required', 'Breakdown']
 
 const MachineDetail = () => {
   const { name } = useParams()
@@ -31,28 +38,70 @@ const MachineDetail = () => {
     chartData: { weekly: { labels: [], datasets: [] }, monthly: { labels: [], datasets: [] } },
   })
   const [lastUpdate, setLastUpdate] = useState(new Date())
+  const [showAbnormalityAlert, setShowAbnormalityAlert] = useState(false)
+  const [abnormalityMessage, setAbnormalityMessage] = useState('')
+  const [realtimeEnabled, setRealtimeEnabled] = useState(true)
 
-  // Fetch machine data on component mount and when machine name changes
-  useEffect(() => {
-    const fetchMachineData = async () => {
-      try {
-        setLoading(true)
-        // Make API call to get machine details
-        const response = await axios.get(`/api/machine-detail/${name}`)
-        setMachineData(response.data)
-        setLastUpdate(new Date())
-        setLoading(false)
-      } catch (err) {
-        console.error('Error fetching machine details:', err)
-        setError(err.response?.data?.message || 'Failed to fetch machine data')
-        setLoading(false)
+  // Function to fetch machine data
+  const fetchMachineData = async () => {
+    try {
+      const response = await axios.get(`/api/machine-detail/${name}`)
+
+      // Check for abnormalities in the new data
+      const newStatus = response.data.latestRecord?.OPERATION_NAME
+      const currentStatus = machineData.latestRecord?.OPERATION_NAME
+
+      // Detect abnormality status change
+      if (
+        currentStatus &&
+        newStatus &&
+        currentStatus !== newStatus &&
+        ABNORMALITY_STATUSES.includes(newStatus)
+      ) {
+        setShowAbnormalityAlert(true)
+        setAbnormalityMessage(`Machine status changed to ${newStatus}!`)
+
+        // Optionally: Play a sound alert
+        const alertSound = new Audio('/assets/alert-sound.mp3')
+        alertSound.play().catch((e) => console.log('Error playing alert sound:', e))
       }
-    }
 
+      setMachineData(response.data)
+      setLastUpdate(new Date())
+      setLoading(false)
+    } catch (err) {
+      console.error('Error fetching machine details:', err)
+      setError(err.response?.data?.message || 'Failed to fetch machine data')
+      setLoading(false)
+      setRealtimeEnabled(false) // Disable realtime updates if there's an error
+    }
+  }
+
+  // Initial data fetch
+  useEffect(() => {
     if (name) {
+      setLoading(true)
       fetchMachineData()
     }
   }, [name])
+
+  // Set up real-time updates
+  useEffect(() => {
+    let intervalId
+
+    if (realtimeEnabled && name) {
+      intervalId = setInterval(() => {
+        fetchMachineData()
+      }, REALTIME_UPDATE_INTERVAL)
+    }
+
+    // Clean up the interval on component unmount
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [realtimeEnabled, name, machineData.latestRecord?.OPERATION_NAME])
 
   // Handle chart color scheme updates
   useEffect(() => {
@@ -82,15 +131,23 @@ const MachineDetail = () => {
   const handleManualRefresh = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`/api/machine-detail/${name}`)
-      setMachineData(response.data)
-      setLastUpdate(new Date())
+      await fetchMachineData()
       setLoading(false)
     } catch (err) {
       console.error('Error refreshing machine details:', err)
       setError(err.response?.data?.message || 'Failed to refresh machine data')
       setLoading(false)
     }
+  }
+
+  // Toggle realtime updates
+  const toggleRealtime = () => {
+    setRealtimeEnabled((prev) => !prev)
+  }
+
+  // Dismiss abnormality alert
+  const dismissAlert = () => {
+    setShowAbnormalityAlert(false)
   }
 
   // Generate status cards from machine data
@@ -158,6 +215,17 @@ const MachineDetail = () => {
 
   return (
     <div>
+      {/* Abnormality Alert */}
+      {showAbnormalityAlert && (
+        <CToast visible className="mb-3 text-white bg-danger" onClose={dismissAlert}>
+          <CToastHeader closeButton>
+            <strong className="me-auto">Abnormality Detected</strong>
+            <small>{new Date().toLocaleTimeString()}</small>
+          </CToastHeader>
+          <CToastBody>{abnormalityMessage}</CToastBody>
+        </CToast>
+      )}
+
       <CRow className="mb-3">
         <CCol md={6}>
           <h2>Detail Mesin: {decodeURIComponent(name)}</h2>
@@ -165,6 +233,15 @@ const MachineDetail = () => {
         <CCol md={6} className="text-end">
           <div className="d-flex justify-content-end align-items-center">
             <span className="me-3">Last updated: {lastUpdate.toLocaleTimeString()}</span>
+            <CButtonGroup className="me-2">
+              <CButton
+                color={realtimeEnabled ? 'success' : 'secondary'}
+                size="sm"
+                onClick={toggleRealtime}
+              >
+                {realtimeEnabled ? 'Realtime: ON' : 'Realtime: OFF'}
+              </CButton>
+            </CButtonGroup>
             <button
               className="btn btn-outline-primary"
               onClick={handleManualRefresh}
@@ -176,7 +253,7 @@ const MachineDetail = () => {
         </CCol>
       </CRow>
 
-      {loading ? (
+      {loading && machineData.latestRecord?.OPERATION_NAME === undefined ? (
         <CRow className="text-center py-5">
           <CCol>
             <CSpinner color="primary" />
@@ -206,6 +283,14 @@ const MachineDetail = () => {
             <ShiftDetail shifts={machineData.shifts || []} />
           </CRow>
         </>
+      )}
+
+      {/* Realtime indicator */}
+      {realtimeEnabled && (
+        <div className="realtime-indicator">
+          <div className={`realtime-dot ${loading ? 'pulse' : ''}`}></div>
+          <span>Realtime</span>
+        </div>
       )}
     </div>
   )
