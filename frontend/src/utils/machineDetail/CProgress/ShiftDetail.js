@@ -8,7 +8,7 @@ import {
   getAllData,
 } from './ShiftCalculations'
 
-const ShiftDetail = ({ shifts }) => {
+const ShiftDetail = ({ shifts, selectedDate }) => {
   const [currentTime, setCurrentTime] = useState(new Date())
 
   // Update current time every minute
@@ -31,6 +31,19 @@ const ShiftDetail = ({ shifts }) => {
   // Get current minute for display
   const getCurrentMinute = () => {
     return currentTime.getMinutes()
+  }
+
+  // Parse the selected date
+  const parsedSelectedDate = new Date(selectedDate)
+
+  // Check if we're looking at historical data (not today)
+  const isHistoricalView = () => {
+    const today = new Date()
+    return (
+      parsedSelectedDate.getDate() !== today.getDate() ||
+      parsedSelectedDate.getMonth() !== today.getMonth() ||
+      parsedSelectedDate.getFullYear() !== today.getFullYear()
+    )
   }
 
   // Get all data across shifts
@@ -59,37 +72,42 @@ const ShiftDetail = ({ shifts }) => {
         const startHourNum = parseInt(shiftStartHour.split(':')[0], 10)
         const endHourNum = parseInt(shiftEndHour.split(':')[0], 10)
 
-        // Check if this shift has started yet
-        const shiftHasStarted = hasShiftStarted(
-          shiftStartHour,
-          getCurrentHour(),
-          getCurrentMinute(),
-        )
+        // For historical data, always show all shifts
+        // For today's data, only show shifts that have started
+        let shiftHasStarted = true
+        if (!isHistoricalView()) {
+          shiftHasStarted = hasShiftStarted(shiftStartHour, getCurrentHour(), getCurrentMinute())
+        }
 
         // If shift hasn't started yet, don't render it
         if (!shiftHasStarted) {
           return null
         }
 
-        // Determine if current time falls within this shift
+        // Determine if current time falls within this shift (only relevant for today)
         const currentHour = getCurrentHour()
         const currentMinute = getCurrentMinute()
-        const isActiveShift = isTimeInShift(
-          currentHour,
-          currentMinute,
-          shiftStartHour,
-          shiftEndHour,
-        )
+        const isActiveShift =
+          !isHistoricalView() &&
+          isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
 
         // Find the latest data before this shift starts
         const latestBeforeShift = findLatestDataBeforeShift(
           allShiftData,
           shiftStartHour,
-          currentTime,
+          isHistoricalView()
+            ? new Date(parsedSelectedDate.getTime() + 24 * 60 * 60 * 1000)
+            : currentTime,
         )
 
         // Calculate hourly production values
-        const hourlyProduction = calculateHourlyProduction(shift.data, shiftHours, currentTime)
+        const hourlyProduction = calculateHourlyProduction(
+          shift.data,
+          shiftHours,
+          isHistoricalView()
+            ? new Date(parsedSelectedDate.getTime() + 24 * 60 * 60 * 1000)
+            : currentTime,
+        )
 
         return (
           <CCol md={12} key={index}>
@@ -106,12 +124,18 @@ const ShiftDetail = ({ shifts }) => {
                   endHourNum={endHourNum}
                   latestBeforeShift={latestBeforeShift}
                   isActiveShift={isActiveShift}
-                  currentTime={currentTime}
+                  currentTime={
+                    isHistoricalView()
+                      ? new Date(parsedSelectedDate.getTime() + 24 * 60 * 60 * 1000)
+                      : currentTime
+                  }
                   hourlyProduction={hourlyProduction}
-                  isWithinProductionHours={isWithinProductionHours(
-                    currentTime.getHours(),
-                    standardStartTime,
-                  )}
+                  isWithinProductionHours={
+                    isHistoricalView()
+                      ? true
+                      : isWithinProductionHours(currentTime.getHours(), standardStartTime)
+                  }
+                  isHistoricalView={isHistoricalView()}
                 />
               </CCardBody>
             </CCard>

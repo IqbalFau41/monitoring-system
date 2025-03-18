@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import axios from 'axios'
-import { CChartLine } from '@coreui/react-chartjs'
-import { getStyle } from '@coreui/utils'
 import {
   CCard,
   CCardBody,
@@ -16,9 +14,9 @@ import {
   CToast,
   CToastBody,
   CToastHeader,
+  CFormInput,
 } from '@coreui/react'
 import './machinedetail.css'
-import { chartOptions } from './dataMachine.js'
 import ShiftDetail from './CProgress/ShiftDetail.js'
 
 // Configuration for real-time updates
@@ -27,32 +25,53 @@ const ABNORMALITY_STATUSES = ['Warning', 'Error', 'Maintenance Required', 'Break
 
 const MachineDetail = () => {
   const { name } = useParams()
-  const chartRef = useRef(null)
-  const [viewMode, setViewMode] = useState('week') // 'week' or 'month'
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [machineData, setMachineData] = useState({
     machineInfo: {},
     latestRecord: {},
     shifts: [],
-    chartData: { weekly: { labels: [], datasets: [] }, monthly: { labels: [], datasets: [] } },
   })
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [showAbnormalityAlert, setShowAbnormalityAlert] = useState(false)
   const [abnormalityMessage, setAbnormalityMessage] = useState('')
   const [realtimeEnabled, setRealtimeEnabled] = useState(true)
+  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()))
+
+  // Calculate min date (1 month ago)
+  const getMinDate = () => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - 1)
+    return formatDate(date)
+  }
+
+  // Calculate max date (today)
+  const getMaxDate = () => {
+    return formatDate(new Date())
+  }
+
+  // Format date to YYYY-MM-DD for input
+  function formatDate(date) {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
 
   // Function to fetch machine data
-  const fetchMachineData = async () => {
+  const fetchMachineData = async (date = selectedDate) => {
     try {
-      const response = await axios.get(`/api/machine-detail/${name}`)
+      const response = await axios.get(`/api/machine-detail/${name}`, {
+        params: { date },
+      })
 
       // Check for abnormalities in the new data
       const newStatus = response.data.latestRecord?.OPERATION_NAME
       const currentStatus = machineData.latestRecord?.OPERATION_NAME
 
-      // Detect abnormality status change
+      // Detect abnormality status change (only in realtime mode)
       if (
+        realtimeEnabled &&
         currentStatus &&
         newStatus &&
         currentStatus !== newStatus &&
@@ -89,7 +108,7 @@ const MachineDetail = () => {
   useEffect(() => {
     let intervalId
 
-    if (realtimeEnabled && name) {
+    if (realtimeEnabled && name && selectedDate === formatDate(new Date())) {
       intervalId = setInterval(() => {
         fetchMachineData()
       }, REALTIME_UPDATE_INTERVAL)
@@ -101,31 +120,7 @@ const MachineDetail = () => {
         clearInterval(intervalId)
       }
     }
-  }, [realtimeEnabled, name, machineData.latestRecord?.OPERATION_NAME])
-
-  // Handle chart color scheme updates
-  useEffect(() => {
-    const handleColorSchemeChange = () => {
-      if (chartRef.current) {
-        setTimeout(() => {
-          const current = chartRef.current
-          current.options.scales.x.grid.borderColor = getStyle('--cui-border-color-translucent')
-          current.options.scales.x.grid.color = getStyle('--cui-border-color-translucent')
-          current.options.scales.x.ticks.color = getStyle('--cui-body-color')
-          current.options.scales.y.grid.borderColor = getStyle('--cui-border-color-translucent')
-          current.options.scales.y.grid.color = getStyle('--cui-border-color-translucent')
-          current.options.scales.y.ticks.color = getStyle('--cui-body-color')
-          current.update()
-        })
-      }
-    }
-
-    document.documentElement.addEventListener('ColorSchemeChange', handleColorSchemeChange)
-
-    return () => {
-      document.documentElement.removeEventListener('ColorSchemeChange', handleColorSchemeChange)
-    }
-  }, [chartRef])
+  }, [realtimeEnabled, name, selectedDate, machineData.latestRecord?.OPERATION_NAME])
 
   // Manual refresh function
   const handleManualRefresh = async () => {
@@ -148,6 +143,35 @@ const MachineDetail = () => {
   // Dismiss abnormality alert
   const dismissAlert = () => {
     setShowAbnormalityAlert(false)
+  }
+
+  // Handle date change
+  const handleDateChange = (e) => {
+    const newDate = e.target.value
+
+    // Ensure the date is within the valid range
+    const minDate = getMinDate()
+    const maxDate = getMaxDate()
+
+    if (newDate < minDate) {
+      alert('Cannot view data more than 1 month in the past')
+      return
+    }
+
+    if (newDate > maxDate) {
+      alert('Cannot view future dates')
+      return
+    }
+
+    setSelectedDate(newDate)
+
+    // Disable realtime if historical date selected
+    if (newDate !== formatDate(new Date())) {
+      setRealtimeEnabled(false)
+    }
+
+    setLoading(true)
+    fetchMachineData(newDate)
   }
 
   // Generate status cards from machine data
@@ -185,7 +209,7 @@ const MachineDetail = () => {
       {
         header: 'Production Summary',
         content: [
-          `Today's Production: ${MACHINE_COUNTER || 0}`,
+          `Production: ${MACHINE_COUNTER || 0}`,
           `Target: ${machineData.machineInfo?.TARGET_PRODUCTION || 2000} pcs`,
           `Efficiency: ${Math.round(((MACHINE_COUNTER || 0) / (machineData.machineInfo?.TARGET_PRODUCTION || 2000)) * 100)}%`,
         ],
@@ -213,6 +237,9 @@ const MachineDetail = () => {
 
   const cards = generateStatusCards()
 
+  // Check if viewing historical data
+  const isHistoricalView = selectedDate !== formatDate(new Date())
+
   return (
     <div>
       {/* Abnormality Alert */}
@@ -232,12 +259,24 @@ const MachineDetail = () => {
         </CCol>
         <CCol md={6} className="text-end">
           <div className="d-flex justify-content-end align-items-center">
+            <div className="me-3 d-flex align-items-center">
+              <span className="me-2">Date:</span>
+              <CFormInput
+                type="date"
+                value={selectedDate}
+                onChange={handleDateChange}
+                min={getMinDate()}
+                max={getMaxDate()}
+                style={{ width: '180px' }}
+              />
+            </div>
             <span className="me-3">Last updated: {lastUpdate.toLocaleTimeString()}</span>
             <CButtonGroup className="me-2">
               <CButton
                 color={realtimeEnabled ? 'success' : 'secondary'}
                 size="sm"
                 onClick={toggleRealtime}
+                disabled={isHistoricalView}
               >
                 {realtimeEnabled ? 'Realtime: ON' : 'Realtime: OFF'}
               </CButton>
@@ -252,6 +291,18 @@ const MachineDetail = () => {
           </div>
         </CCol>
       </CRow>
+
+      {/* Historical data indicator */}
+      {isHistoricalView && (
+        <CRow className="mb-3">
+          <CCol>
+            <div className="alert alert-info">
+              <i className="fa fa-history me-2"></i>
+              Viewing historical data for {new Date(selectedDate).toLocaleDateString()}
+            </div>
+          </CCol>
+        </CRow>
+      )}
 
       {loading && machineData.latestRecord?.OPERATION_NAME === undefined ? (
         <CRow className="text-center py-5">
@@ -280,13 +331,13 @@ const MachineDetail = () => {
 
           {/* Production details section */}
           <CRow>
-            <ShiftDetail shifts={machineData.shifts || []} />
+            <ShiftDetail shifts={machineData.shifts || []} selectedDate={selectedDate} />
           </CRow>
         </>
       )}
 
       {/* Realtime indicator */}
-      {realtimeEnabled && (
+      {realtimeEnabled && !isHistoricalView && (
         <div className="realtime-indicator">
           <div className={`realtime-dot ${loading ? 'pulse' : ''}`}></div>
           <span>Realtime</span>

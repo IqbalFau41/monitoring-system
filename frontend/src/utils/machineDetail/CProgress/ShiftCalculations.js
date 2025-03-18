@@ -134,13 +134,73 @@ export const getAllData = (shifts) => {
 export const getOperationColor = (operationType) => {
   if (!operationType) return 'secondary'
 
-  if (operationType.toUpperCase() === 'NORMAL OPERATION') {
-    return 'success' // Green for normal operation
-  } else if (operationType.toUpperCase() === 'CHOKOTEI') {
-    return 'warning' // Yellow for chokotei
-  } else if (operationType.toUpperCase() === 'WARNING') {
-    return 'danger' // Red for warning
-  } else {
-    return 'info' // Blue for other operations
+  const operationUpper = operationType.toUpperCase()
+
+  // Normal operations - green
+  if (['NORMAL OPERATION', 'PEMANASAN', 'TENKEN'].includes(operationUpper)) {
+    return 'success'
+  }
+
+  // Warning/problem states - red
+  else if (['TROUBLE MACHINE', 'MACHINE OFF', 'REPAIR', 'NOT CONNECTED'].includes(operationUpper)) {
+    return 'danger'
+  }
+
+  // Scheduled delays - yellow
+  else if (
+    [
+      'CHOKOTEI',
+      'DANDORI',
+      'TOOL CHANGES',
+      'GANTI TOISHI',
+      'GANTI DRESSER',
+      'DRESSING PROFILE',
+      'DRESS-2',
+    ].includes(operationUpper)
+  ) {
+    return 'warning'
+  }
+
+  // Planned stops - orange
+  else if (
+    [
+      'STOP PLANNING',
+      'JAM ISTIRAHAT',
+      'RENCANA PERBAIKAN',
+      'PLAN PROSES SELESAI',
+      'MEETING PAGI/SORE',
+    ].includes(operationUpper)
+  ) {
+    return 'warning-orange'
+  }
+
+  // Waiting states - blue
+  else if (['WAITING MATERIAL', 'ANTRI JOB', 'MENUNGGU INTRUKSI ATASAN'].includes(operationUpper)) {
+    return 'info'
+  }
+
+  // Quality check states - purple
+  else if (['CEK QC', 'CHECK HAGATA', '1 TOOTH'].includes(operationUpper)) {
+    return 'purple'
+  }
+
+  // Improvement activities - teal
+  else if (['5S', 'KAIZEN', 'TRIAL'].includes(operationUpper)) {
+    return 'teal'
+  }
+
+  // Administrative - light gray
+  else if (['INPUT DATA', 'BUANG KIRIKO', 'CONTROL LOSS TIME'].includes(operationUpper)) {
+    return 'light'
+  }
+
+  // Unknown/other - dark gray
+  else if (['UNKNOWN LOSS TIME'].includes(operationUpper)) {
+    return 'dark'
+  }
+
+  // Default for any unmatched operation
+  else {
+    return 'secondary'
   }
 }

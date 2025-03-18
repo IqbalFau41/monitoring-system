@@ -1,5 +1,5 @@
 import React from 'react'
-import { CProgress, CProgressStacked } from '@coreui/react'
+import { CProgress, CProgressStacked, CTooltip } from '@coreui/react'
 import { calculateTimePosition, calculateCurrentTimePosition, isTimeInShift } from './TimeUtils'
 import { getOperationColor } from './ShiftCalculations'
 
@@ -18,6 +18,17 @@ const ShiftProgressBar = ({
   const currentMinute = currentTime.getMinutes()
   const shiftStartHour = shiftHours[0]
   const shiftEndHour = shiftHours[shiftHours.length - 1]
+
+  // Helper function to format time duration
+  const formatDuration = (startTime, endTime) => {
+    // Calculate duration in minutes
+    let diffMs = endTime - startTime
+    let diffMins = Math.floor(diffMs / 60000) // Convert ms to minutes
+    let hours = Math.floor(diffMins / 60)
+    let mins = diffMins % 60
+
+    return hours > 0 ? `${hours} hr ${mins} min` : `${mins} min`
+  }
 
   // Create status timeline segments for continuous visualization
   const createStatusSegments = () => {
@@ -100,6 +111,8 @@ const ShiftProgressBar = ({
 
           // Calculate end position based on next record or current time
           let endPosition
+          let endTime
+
           if (i < combinedRecords.length - 1) {
             // If there's a next record, use its time
             const nextRecord = combinedRecords[i + 1]
@@ -114,6 +127,7 @@ const ShiftProgressBar = ({
               endHourNum,
               shiftHours.length,
             )
+            endTime = nextTime
           } else {
             // For the last record, extend up to current time if it's active shift
             if (isActiveShift) {
@@ -127,6 +141,7 @@ const ShiftProgressBar = ({
               )
 
               endPosition = currentTimePosition
+              endTime = new Date(currentTime)
             } else {
               // For completed shifts, extend to the end of the shift
               // But not beyond current time if current time is within this shift
@@ -142,10 +157,25 @@ const ShiftProgressBar = ({
               // If current time is within this shift's hours
               if (isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)) {
                 endPosition = currentTimePosition
+                endTime = new Date(currentTime)
               } else {
                 endPosition = shiftEndPosition
+                // Create end time at shift end
+                endTime = new Date(recordTime)
+                const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+                endTime.setHours(endHourInt)
+                endTime.setMinutes(0)
+                endTime.setSeconds(0)
               }
             }
+          }
+
+          // Calculate production for this segment
+          let productionCount = 0
+          if (i < combinedRecords.length - 1) {
+            const nextRecord = combinedRecords[i + 1]
+            productionCount = (nextRecord.MACHINE_COUNTER || 0) - (record.MACHINE_COUNTER || 0)
+            productionCount = Math.max(0, productionCount) // Ensure non-negative
           }
 
           // Add segment to our timeline (only if it has width)
@@ -158,6 +188,9 @@ const ShiftProgressBar = ({
               operationType: record.OPERATION_NAME || '',
               counter: record.MACHINE_COUNTER || 0,
               color: getOperationColor(record.OPERATION_NAME),
+              startTime: recordTime,
+              endTime: endTime,
+              production: productionCount,
             })
           }
         }
@@ -178,6 +211,10 @@ const ShiftProgressBar = ({
 
             // Only add empty space up to current time position if it's greater than total width
             if (currentTimePosition > totalWidth) {
+              const lastSegment =
+                statusSegments.length > 0 ? statusSegments[statusSegments.length - 1] : null
+              const startTime = lastSegment ? lastSegment.endTime : new Date(currentTime)
+
               statusSegments.push({
                 start: totalWidth,
                 end: currentTimePosition,
@@ -191,12 +228,16 @@ const ShiftProgressBar = ({
                   statusSegments.length > 0
                     ? statusSegments[statusSegments.length - 1].color
                     : 'secondary',
+                startTime: startTime,
+                endTime: new Date(currentTime),
+                production: 0,
               })
             }
           } else {
             // For inactive shifts, fill to the end with the last known status
             // But not beyond current time if the shift hasn't completed yet
             let endPosition = 100
+            let endTime
 
             // If current time is within this shift's hours
             if (isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)) {
@@ -208,7 +249,19 @@ const ShiftProgressBar = ({
                 shiftHours.length,
               )
               endPosition = currentTimePosition
+              endTime = new Date(currentTime)
+            } else {
+              // End time is shift end
+              endTime = new Date()
+              const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+              endTime.setHours(endHourInt)
+              endTime.setMinutes(0)
+              endTime.setSeconds(0)
             }
+
+            const lastSegment =
+              statusSegments.length > 0 ? statusSegments[statusSegments.length - 1] : null
+            const startTime = lastSegment ? lastSegment.endTime : new Date(currentTime)
 
             statusSegments.push({
               start: totalWidth,
@@ -223,6 +276,9 @@ const ShiftProgressBar = ({
                 statusSegments.length > 0
                   ? statusSegments[statusSegments.length - 1].color
                   : 'secondary',
+              startTime: startTime,
+              endTime: endTime,
+              production: 0,
             })
           }
         }
@@ -257,6 +313,26 @@ const ShiftProgressBar = ({
           ? currentTimePosition
           : 100
 
+      // Create start and end times for tooltip
+      const startTime = new Date()
+      startTime.setHours(startHourNum)
+      startTime.setMinutes(0)
+      startTime.setSeconds(0)
+
+      let endTime
+      if (
+        isActiveShift ||
+        isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+      ) {
+        endTime = new Date(currentTime)
+      } else {
+        endTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        endTime.setHours(endHourInt)
+        endTime.setMinutes(0)
+        endTime.setSeconds(0)
+      }
+
       // Only create a segment if there's width
       if (endPosition > 0) {
         statusSegments.push({
@@ -266,11 +342,21 @@ const ShiftProgressBar = ({
           operationType: latestBeforeShift.OPERATION_NAME || '',
           counter: latestBeforeShift.MACHINE_COUNTER || 0,
           color: getOperationColor(latestBeforeShift.OPERATION_NAME),
+          startTime: startTime,
+          endTime: endTime,
+          production: 0,
         })
       }
 
       // If we haven't reached the end of the shift and it's not an active shift
       if (endPosition < 100 && !isActiveShift) {
+        const remainingStartTime = new Date(endTime)
+        const remainingEndTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        remainingEndTime.setHours(endHourInt)
+        remainingEndTime.setMinutes(0)
+        remainingEndTime.setSeconds(0)
+
         statusSegments.push({
           start: endPosition,
           end: 100,
@@ -278,6 +364,9 @@ const ShiftProgressBar = ({
           operationType: '',
           counter: 0,
           color: 'secondary',
+          startTime: remainingStartTime,
+          endTime: remainingEndTime,
+          production: 0,
         })
       }
     } else {
@@ -293,6 +382,26 @@ const ShiftProgressBar = ({
             )
           : 100
 
+      // Create start and end times for tooltip
+      const startTime = new Date()
+      startTime.setHours(startHourNum)
+      startTime.setMinutes(0)
+      startTime.setSeconds(0)
+
+      let endTime
+      if (
+        isActiveShift ||
+        isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+      ) {
+        endTime = new Date(currentTime)
+      } else {
+        endTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        endTime.setHours(endHourInt)
+        endTime.setMinutes(0)
+        endTime.setSeconds(0)
+      }
+
       // Completely empty shift - create one segment indicating signal loss
       statusSegments.push({
         start: 0,
@@ -301,10 +410,20 @@ const ShiftProgressBar = ({
         operationType: 'SIGNAL LOSS',
         counter: 0,
         color: 'danger', // Using red to indicate signal loss
+        startTime: startTime,
+        endTime: endTime,
+        production: 0,
       })
 
       // If we haven't reached the end and it's not active
       if (currentTimePosition < 100 && !isActiveShift) {
+        const remainingStartTime = new Date(endTime)
+        const remainingEndTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        remainingEndTime.setHours(endHourInt)
+        remainingEndTime.setMinutes(0)
+        remainingEndTime.setSeconds(0)
+
         statusSegments.push({
           start: currentTimePosition,
           end: 100,
@@ -312,6 +431,9 @@ const ShiftProgressBar = ({
           operationType: '',
           counter: 0,
           color: 'secondary',
+          startTime: remainingStartTime,
+          endTime: remainingEndTime,
+          production: 0,
         })
       }
     }
@@ -336,6 +458,26 @@ const ShiftProgressBar = ({
           ? currentTimePosition
           : 100
 
+      // Create start and end times for tooltip
+      const startTime = new Date()
+      startTime.setHours(startHourNum)
+      startTime.setMinutes(0)
+      startTime.setSeconds(0)
+
+      let endTime
+      if (
+        isActiveShift ||
+        isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+      ) {
+        endTime = new Date(currentTime)
+      } else {
+        endTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        endTime.setHours(endHourInt)
+        endTime.setMinutes(0)
+        endTime.setSeconds(0)
+      }
+
       // Only create a segment if there's width
       if (endPosition > 0) {
         statusSegments.push({
@@ -345,11 +487,21 @@ const ShiftProgressBar = ({
           operationType: latestBeforeShift.OPERATION_NAME || '',
           counter: latestBeforeShift.MACHINE_COUNTER || 0,
           color: getOperationColor(latestBeforeShift.OPERATION_NAME),
+          startTime: startTime,
+          endTime: endTime,
+          production: 0,
         })
       }
 
       // If we haven't reached the end of the shift and it's not an active shift
       if (endPosition < 100 && !isActiveShift) {
+        const remainingStartTime = new Date(endTime)
+        const remainingEndTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        remainingEndTime.setHours(endHourInt)
+        remainingEndTime.setMinutes(0)
+        remainingEndTime.setSeconds(0)
+
         statusSegments.push({
           start: endPosition,
           end: 100,
@@ -357,6 +509,9 @@ const ShiftProgressBar = ({
           operationType: '',
           counter: 0,
           color: 'secondary',
+          startTime: remainingStartTime,
+          endTime: remainingEndTime,
+          production: 0,
         })
       }
     } else {
@@ -372,6 +527,26 @@ const ShiftProgressBar = ({
             )
           : 100
 
+      // Create start and end times for tooltip
+      const startTime = new Date()
+      startTime.setHours(startHourNum)
+      startTime.setMinutes(0)
+      startTime.setSeconds(0)
+
+      let endTime
+      if (
+        isActiveShift ||
+        isTimeInShift(currentHour, currentMinute, shiftStartHour, shiftEndHour)
+      ) {
+        endTime = new Date(currentTime)
+      } else {
+        endTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        endTime.setHours(endHourInt)
+        endTime.setMinutes(0)
+        endTime.setSeconds(0)
+      }
+
       // Completely empty shift - create one segment indicating signal loss
       statusSegments.push({
         start: 0,
@@ -380,10 +555,20 @@ const ShiftProgressBar = ({
         operationType: 'SIGNAL LOSS',
         counter: 0,
         color: 'danger', // Using red to indicate signal loss
+        startTime: startTime,
+        endTime: endTime,
+        production: 0,
       })
 
       // If we haven't reached the end and it's not active
       if (currentTimePosition < 100 && !isActiveShift) {
+        const remainingStartTime = new Date(endTime)
+        const remainingEndTime = new Date()
+        const endHourInt = parseInt(shiftEndHour.split(':')[0], 10)
+        remainingEndTime.setHours(endHourInt)
+        remainingEndTime.setMinutes(0)
+        remainingEndTime.setSeconds(0)
+
         statusSegments.push({
           start: currentTimePosition,
           end: 100,
@@ -391,6 +576,9 @@ const ShiftProgressBar = ({
           operationType: '',
           counter: 0,
           color: 'secondary',
+          startTime: remainingStartTime,
+          endTime: remainingEndTime,
+          production: 0,
         })
       }
     }
@@ -398,6 +586,14 @@ const ShiftProgressBar = ({
 
   // Get the status segments
   const statusSegments = createStatusSegments()
+
+  // Format time for tooltip display
+  const formatTime = (date) => {
+    if (!date) return ''
+    const hours = date.getHours().toString().padStart(2, '0')
+    const minutes = date.getMinutes().toString().padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
 
   return (
     <div className="grid-container">
@@ -418,9 +614,25 @@ const ShiftProgressBar = ({
 
       <div className="progress-container">
         <CProgressStacked className="progress-stacked">
-          {/* Render status segments as continuous timeline */}
+          {/* Render status segments as continuous timeline with tooltips */}
           {statusSegments.map((segment, idx) => (
-            <CProgress key={idx} color={segment.color} value={segment.width} />
+            <CTooltip
+              key={idx}
+              content={
+                <div>
+                  <strong>{segment.operationType || 'Unknown Operation'}</strong>
+                  <br />
+                  {formatTime(segment.startTime)} - {formatTime(segment.endTime)}
+                  <br />
+                  Duration: {formatDuration(segment.startTime, segment.endTime)}
+                  <br />
+                  Production: {segment.production} units
+                </div>
+              }
+              placement="top"
+            >
+              <CProgress color={segment.color} value={segment.width} />
+            </CTooltip>
           ))}
 
           {/* Time progress indicator as a separate overlay */}

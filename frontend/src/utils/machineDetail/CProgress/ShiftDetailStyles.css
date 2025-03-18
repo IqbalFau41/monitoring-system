@@ -42,3 +42,43 @@
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
   z-index: 10;
 }
+
+/* Custom colors for operation types */
+.bg-warning-orange {
+  background-color: #fd7e14 !important;
+  color: white !important;
+}
+
+.border-warning-orange {
+  border-color: #fd7e14 !important;
+}
+
+.text-warning-orange {
+  color: #fd7e14 !important;
+}
+
+.bg-purple {
+  background-color: #6f42c1 !important;
+  color: white !important;
+}
+
+.border-purple {
+  border-color: #6f42c1 !important;
+}
+
+.text-purple {
+  color: #6f42c1 !important;
+}
+
+.bg-teal {
+  background-color: #20c997 !important;
+  color: white !important;
+}
+
+.border-teal {
+  border-color: #20c997 !important;
+}
+
+.text-teal {
+  color: #20c997 !important;
+}
