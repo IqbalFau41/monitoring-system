@@ -84,6 +84,8 @@ export const UpdateJobModal = ({ updateItem, setUpdateItem, fetchJobs, showSucce
             { label: 'Pilih Status', value: '' },
             { label: 'PENDING', value: 'PENDING' },
             { label: 'IN PROGRESS', value: 'IN PROGRESS' },
+            { label: 'ORDER', value: 'ORDER' },
+            { label: 'PR', value: 'PR' },
             { label: 'COMPLETED', value: 'COMPLETED' },
           ]}
           className="mb-3"

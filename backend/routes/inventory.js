@@ -32,7 +32,8 @@ router.get("/", async (req, res) => {
         name_part, 
         type_part, 
         maker_part, 
-        qty_part, 
+        qty_part,
+        location_part, 
         information_part 
       FROM INVENTORY_PARTS
       ORDER BY no_part DESC
@@ -53,7 +54,7 @@ router.get("/:id", async (req, res) => {
   const { id } = req.params;
 
   // Validate ID
-  if (!id || isNaN(parseInt(id))) {
+  if (!id) {
     return res.status(400).json({ error: "Valid ID is required" });
   }
 
@@ -73,7 +74,8 @@ router.get("/:id", async (req, res) => {
         name_part, 
         type_part, 
         maker_part, 
-        qty_part, 
+        qty_part,
+        location_part, 
         information_part 
       FROM INVENTORY_PARTS 
       WHERE no_part = @id
@@ -104,49 +106,32 @@ router.post("/", validateBody, async (req, res) => {
 
     const request = deptMfg.request();
 
-    // Required fields
+    // Fields matching frontend
+    request.input("no_part", req.body.no_part);
     request.input("name_part", req.body.name_part);
-    request.input("qty_part", req.body.qty_part);
-
-    // Optional fields
     request.input("type_part", req.body.type_part || null);
     request.input("maker_part", req.body.maker_part || null);
+    request.input("qty_part", req.body.qty_part);
+    request.input("location_part", req.body.location_part || null);
     request.input("information_part", req.body.information_part || null);
-
-    // Additional fields that might be required by the database
-    const currentDate = new Date().toISOString().split("T")[0];
-    request.input("date_part", req.body.date_part || currentDate);
-    request.input("delivery_note", req.body.delivery_note || null);
-    request.input("purchase_order", req.body.purchase_order || null);
-    request.input("unit_part", req.body.unit_part || null);
-    request.input("recipient_part", req.body.recipient_part || null);
-    request.input("pic_part", req.body.pic_part || null);
 
     await request.query(`
       INSERT INTO INVENTORY_PARTS (
-        date_part, 
-        delivery_note, 
-        purchase_order, 
+        no_part,
         name_part, 
         type_part, 
         maker_part, 
-        qty_part, 
-        unit_part, 
-        recipient_part, 
-        information_part, 
-        pic_part
+        qty_part,
+        location_part, 
+        information_part
       ) VALUES (
-        @date_part, 
-        @delivery_note, 
-        @purchase_order, 
+        @no_part,
         @name_part, 
         @type_part, 
         @maker_part, 
-        @qty_part, 
-        @unit_part, 
-        @recipient_part, 
-        @information_part, 
-        @pic_part
+        @qty_part,
+        @location_part, 
+        @information_part
       )
     `);
     res.status(201).json({ message: "Item created successfully" });
@@ -164,7 +149,7 @@ router.put("/:id", validateBody, async (req, res) => {
   const { id } = req.params;
 
   // Validate ID
-  if (!id || isNaN(parseInt(id))) {
+  if (!id) {
     return res.status(400).json({ error: "Valid ID is required" });
   }
 
@@ -191,38 +176,23 @@ router.put("/:id", validateBody, async (req, res) => {
     const updateRequest = deptMfg.request();
     updateRequest.input("id", id);
 
-    // Required fields
+    // Only the fields we need
     updateRequest.input("name_part", req.body.name_part);
-    updateRequest.input("qty_part", req.body.qty_part);
-
-    // Optional fields
     updateRequest.input("type_part", req.body.type_part || null);
     updateRequest.input("maker_part", req.body.maker_part || null);
+    updateRequest.input("qty_part", req.body.qty_part);
+    updateRequest.input("location_part", req.body.location_part || null);
     updateRequest.input("information_part", req.body.information_part || null);
-
-    // Additional fields that might be required by the database
-    const currentDate = new Date().toISOString().split("T")[0];
-    updateRequest.input("date_part", req.body.date_part || currentDate);
-    updateRequest.input("delivery_note", req.body.delivery_note || null);
-    updateRequest.input("purchase_order", req.body.purchase_order || null);
-    updateRequest.input("unit_part", req.body.unit_part || null);
-    updateRequest.input("recipient_part", req.body.recipient_part || null);
-    updateRequest.input("pic_part", req.body.pic_part || null);
 
     await updateRequest.query(`
       UPDATE INVENTORY_PARTS 
       SET 
-        date_part = @date_part, 
-        delivery_note = @delivery_note, 
-        purchase_order = @purchase_order, 
         name_part = @name_part, 
         type_part = @type_part, 
         maker_part = @maker_part, 
-        qty_part = @qty_part, 
-        unit_part = @unit_part, 
-        recipient_part = @recipient_part, 
-        information_part = @information_part, 
-        pic_part = @pic_part
+        qty_part = @qty_part,
+        location_part = @location_part, 
+        information_part = @information_part
       WHERE no_part = @id
     `);
     res.status(200).json({ message: "Item updated successfully" });
@@ -240,7 +210,7 @@ router.delete("/:id", async (req, res) => {
   const { id } = req.params;
 
   // Validate ID
-  if (!id || isNaN(parseInt(id))) {
+  if (!id) {
     return res.status(400).json({ error: "Valid ID is required" });
   }
 

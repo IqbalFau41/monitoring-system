@@ -17,9 +17,9 @@ import {
   CAlert,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPen, cilCheck, cilSearch, cilPlus } from '@coreui/icons'
+import { cilPen, cilCheck, cilSearch, cilPlus, cilSync } from '@coreui/icons'
 import axios from 'axios'
-import '../../../scss/inventoryConfig.scss'
+import './JobList.scss'
 import { TableHeader } from './TableHeader'
 import { AddJobModal } from './AddJobModal'
 import { UpdateJobModal } from './UpdateJobModal'
@@ -86,6 +86,18 @@ const JobList = () => {
     const direction = sortOrder.column === column && sortOrder.direction === 'asc' ? 'desc' : 'asc'
     setSortOrder({ column, direction })
   }
+
+  // Get appropriate icon for status - This is the part we're removing as it doesn't seem to be used
+  // const getStatusIcon = (status) => {
+  //   switch (status?.toLowerCase()) {
+  //     case 'in progress':
+  //       return cilSync
+  //     case 'completed':
+  //       return cilCheck
+  //     default:
+  //       return null
+  //   }
+  // }
 
   // Data processing logic
   const sortedAndFilteredJobs = React.useMemo(() => {

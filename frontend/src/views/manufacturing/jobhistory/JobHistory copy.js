@@ -17,47 +17,35 @@ import {
   CAlert,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilPen, cilTrash, cilSearch, cilPlus } from '@coreui/icons'
+import { cilTrash, cilSearch } from '@coreui/icons'
 import axios from 'axios'
-import './Inventory.scss'
+import './JobHistory.scss'
 import { TableHeader } from './TableHeader'
-import { AddInventoryModal } from './AddInventoryModal'
-import { UpdateInventoryModal } from './UpdateInventoryModal'
-import { DeleteInventoryModal } from './DeleteInventoryModal'
+import { DeleteHistoryModal } from './DeleteHistoryModal'
+import { formatDate } from './JobListUtils'
 
-const Inventory = () => {
+const JobHistory = () => {
   // State declarations
-  const [inventories, setInventories] = useState([])
+  const [jobHistory, setJobHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortOrder, setSortOrder] = useState({ column: 'name_part', direction: 'asc' })
+  const [sortOrder, setSortOrder] = useState({ column: 'COMPLETION_DATE', direction: 'desc' })
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(50)
   const [deleteItem, setDeleteItem] = useState(null)
-  const [updateItem, setUpdateItem] = useState(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [newInventory, setNewInventory] = useState({
-    no_part: '',
-    name_part: '',
-    type_part: '',
-    maker_part: '',
-    qty_part: '',
-    location_part: '',
-    information_part: '',
-  })
 
   // Fetch data function
-  const fetchInventories = async () => {
+  const fetchJobHistory = async () => {
     setLoading(true)
     try {
-      const response = await axios.get('http://localhost:3001/api/inventory')
-      setInventories(response.data || [])
+      const response = await axios.get('http://localhost:3001/api/job-history')
+      setJobHistory(response.data || [])
       setError(null)
     } catch (error) {
-      console.error('Error fetching inventory list:', error)
-      setError('Gagal memuat daftar inventaris. Silakan coba lagi nanti.')
+      console.error('Error fetching job history:', error)
+      setError('Gagal memuat riwayat pekerjaan. Silakan coba lagi nanti.')
     } finally {
       setLoading(false)
     }
@@ -65,7 +53,7 @@ const Inventory = () => {
 
   // Fetch data on component mount
   useEffect(() => {
-    fetchInventories()
+    fetchJobHistory()
   }, [])
 
   // Handle notifications
@@ -76,19 +64,15 @@ const Inventory = () => {
     }, 3000)
   }
 
-  // Action handlers
-  const handleUpdate = (inventory) => {
-    setUpdateItem(inventory)
-  }
-
+  // Sort handler
   const handleSort = (column) => {
     const direction = sortOrder.column === column && sortOrder.direction === 'asc' ? 'desc' : 'asc'
     setSortOrder({ column, direction })
   }
 
   // Data processing logic
-  const sortedAndFilteredInventories = React.useMemo(() => {
-    const filtered = inventories.filter((item) =>
+  const sortedAndFilteredHistory = React.useMemo(() => {
+    const filtered = jobHistory.filter((item) =>
       Object.values(item).some(
         (value) =>
           value &&
@@ -107,17 +91,22 @@ const Inventory = () => {
         return aValue < bValue ? 1 : -1
       }
     })
-  }, [inventories, searchTerm, sortOrder])
+  }, [jobHistory, searchTerm, sortOrder])
 
   // Calculate pagination
   const indexOfLastItem = currentPage * itemsPerPage
   const indexOfFirstItem = indexOfLastItem - itemsPerPage
-  const currentItems = sortedAndFilteredInventories.slice(indexOfFirstItem, indexOfLastItem)
-  const totalPages = Math.ceil(sortedAndFilteredInventories.length / itemsPerPage)
+  const currentItems = sortedAndFilteredHistory.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(sortedAndFilteredHistory.length / itemsPerPage)
 
   // Pagination handler
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber)
+  }
+
+  // Handle delete
+  const handleDelete = (job) => {
+    setDeleteItem(job)
   }
 
   // Loading spinner display
@@ -131,7 +120,7 @@ const Inventory = () => {
 
   // Main component render
   return (
-    <CRow className="inventory-page">
+    <CRow className="job-history-page">
       <CCol xs={12}>
         {error && (
           <CAlert color="danger" dismissible onClose={() => setError(null)}>
@@ -146,11 +135,11 @@ const Inventory = () => {
 
         <CCard className="mb-4">
           <CCardHeader className="d-flex justify-content-between align-items-center flex-wrap">
-            <strong>Daftar Inventaris</strong>
+            <strong>Riwayat Pekerjaan Karyawan</strong>
             <div className="search-container">
               <CFormInput
                 type="text"
-                placeholder="Cari berdasarkan nama atau ID part..."
+                placeholder="Cari berdasarkan nama atau deskripsi..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="mb-2"
@@ -160,31 +149,37 @@ const Inventory = () => {
           </CCardHeader>
 
           <CCardBody>
-            <CButton color="primary" onClick={() => setShowAddModal(true)}>
-              <CIcon icon={cilPlus} className="me-1" /> Tambah Inventaris
-            </CButton>
-
             <div className="fixed-header">
-              <TableHeader column="no_part" sortOrder={sortOrder} handleSort={handleSort}>
-                ID
+              <TableHeader column="NRP" sortOrder={sortOrder} handleSort={handleSort}>
+                NRP
               </TableHeader>
-              <TableHeader column="name_part" sortOrder={sortOrder} handleSort={handleSort}>
-                Nama Part
+              <TableHeader column="NAME" sortOrder={sortOrder} handleSort={handleSort}>
+                Nama
               </TableHeader>
-              <TableHeader column="type_part" sortOrder={sortOrder} handleSort={handleSort}>
-                Tipe Part
+              <TableHeader column="JOB_CLASS" sortOrder={sortOrder} handleSort={handleSort}>
+                Job Class
               </TableHeader>
-              <TableHeader column="maker_part" sortOrder={sortOrder} handleSort={handleSort}>
-                Maker
+              <TableHeader column="JOB_DESC" sortOrder={sortOrder} handleSort={handleSort}>
+                Deskripsi Pekerjaan
               </TableHeader>
-              <TableHeader column="qty_part" sortOrder={sortOrder} handleSort={handleSort}>
-                Kuantitas
+              <TableHeader column="FACTORY" sortOrder={sortOrder} handleSort={handleSort}>
+                Factory
               </TableHeader>
-              <TableHeader column="location_part" sortOrder={sortOrder} handleSort={handleSort}>
-                Lokasi
+              <TableHeader column="DUE_DATE" sortOrder={sortOrder} handleSort={handleSort}>
+                Tenggat
               </TableHeader>
-              <TableHeader column="information_part" sortOrder={sortOrder} handleSort={handleSort}>
-                Informasi
+              <TableHeader column="STATUS" sortOrder={sortOrder} handleSort={handleSort}>
+                Status
+              </TableHeader>
+              <TableHeader column="COMPLETION_DATE" sortOrder={sortOrder} handleSort={handleSort}>
+                Tanggal Selesai
+              </TableHeader>
+              <TableHeader
+                column="ORIGINAL_CREATED_AT"
+                sortOrder={sortOrder}
+                handleSort={handleSort}
+              >
+                Tanggal Dibuat
               </TableHeader>
               <div className="fixed-header-cell">Aksi</div>
             </div>
@@ -193,29 +188,27 @@ const Inventory = () => {
               <CTable striped hover responsive className="responsive-table">
                 <CTableBody>
                   {currentItems.length > 0 ? (
-                    currentItems.map((inventory) => (
-                      <CTableRow key={inventory.no_part}>
-                        <CTableDataCell>{inventory.no_part}</CTableDataCell>
-                        <CTableDataCell>{inventory.name_part}</CTableDataCell>
-                        <CTableDataCell>{inventory.type_part || '-'}</CTableDataCell>
-                        <CTableDataCell>{inventory.maker_part || '-'}</CTableDataCell>
-                        <CTableDataCell>{inventory.qty_part}</CTableDataCell>
-                        <CTableDataCell>{inventory.location_part || '-'}</CTableDataCell>
-                        <CTableDataCell>{inventory.information_part || '-'}</CTableDataCell>
+                    currentItems.map((job) => (
+                      <CTableRow key={job.NRP}>
+                        <CTableDataCell>{job.NRP}</CTableDataCell>
+                        <CTableDataCell>{job.NAME}</CTableDataCell>
+                        <CTableDataCell>{job.JOB_CLASS}</CTableDataCell>
+                        <CTableDataCell>{job.JOB_DESC}</CTableDataCell>
+                        <CTableDataCell>{job.FACTORY}</CTableDataCell>
+                        <CTableDataCell>{formatDate(job.DUE_DATE)}</CTableDataCell>
+                        <CTableDataCell>
+                          <span className={`status-badge status-${job.STATUS?.toLowerCase()}`}>
+                            {job.STATUS || 'N/A'}
+                          </span>
+                        </CTableDataCell>
+                        <CTableDataCell>{formatDate(job.COMPLETION_DATE)}</CTableDataCell>
+                        <CTableDataCell>{formatDate(job.ORIGINAL_CREATED_AT)}</CTableDataCell>
                         <CTableDataCell>
                           <div className="d-flex gap-1">
                             <CButton
-                              color="warning"
-                              size="sm"
-                              onClick={() => handleUpdate(inventory)}
-                              title="Edit"
-                            >
-                              <CIcon icon={cilPen} />
-                            </CButton>
-                            <CButton
                               color="danger"
                               size="sm"
-                              onClick={() => setDeleteItem(inventory)}
+                              onClick={() => handleDelete(job)}
                               title="Hapus"
                             >
                               <CIcon icon={cilTrash} />
@@ -226,8 +219,8 @@ const Inventory = () => {
                     ))
                   ) : (
                     <CTableRow>
-                      <CTableDataCell colSpan="8" className="text-center">
-                        Tidak ada data inventaris yang tersedia
+                      <CTableDataCell colSpan="10" className="text-center">
+                        Tidak ada data riwayat pekerjaan yang tersedia
                       </CTableDataCell>
                     </CTableRow>
                   )}
@@ -264,28 +257,10 @@ const Inventory = () => {
         </CCard>
 
         {/* Modal Components */}
-        <AddInventoryModal
-          visible={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          newInventory={newInventory}
-          setNewInventory={setNewInventory}
-          fetchInventories={fetchInventories}
-          showSuccess={showSuccess}
-          setError={setError}
-        />
-
-        <DeleteInventoryModal
+        <DeleteHistoryModal
           deleteItem={deleteItem}
           setDeleteItem={setDeleteItem}
-          fetchInventories={fetchInventories}
-          showSuccess={showSuccess}
-          setError={setError}
-        />
-
-        <UpdateInventoryModal
-          updateItem={updateItem}
-          setUpdateItem={setUpdateItem}
-          fetchInventories={fetchInventories}
+          fetchJobHistory={fetchJobHistory}
           showSuccess={showSuccess}
           setError={setError}
         />
@@ -294,4 +269,4 @@ const Inventory = () => {
   )
 }
 
-export default Inventory
+export default JobHistory

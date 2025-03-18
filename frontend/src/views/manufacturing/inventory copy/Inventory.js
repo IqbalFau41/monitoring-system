@@ -44,7 +44,6 @@ const Inventory = () => {
     type_part: '',
     maker_part: '',
     qty_part: '',
-    location_part: '',
     information_part: '',
   })
 
@@ -180,9 +179,6 @@ const Inventory = () => {
               <TableHeader column="qty_part" sortOrder={sortOrder} handleSort={handleSort}>
                 Kuantitas
               </TableHeader>
-              <TableHeader column="location_part" sortOrder={sortOrder} handleSort={handleSort}>
-                Lokasi
-              </TableHeader>
               <TableHeader column="information_part" sortOrder={sortOrder} handleSort={handleSort}>
                 Informasi
               </TableHeader>
@@ -200,7 +196,6 @@ const Inventory = () => {
                         <CTableDataCell>{inventory.type_part || '-'}</CTableDataCell>
                         <CTableDataCell>{inventory.maker_part || '-'}</CTableDataCell>
                         <CTableDataCell>{inventory.qty_part}</CTableDataCell>
-                        <CTableDataCell>{inventory.location_part || '-'}</CTableDataCell>
                         <CTableDataCell>{inventory.information_part || '-'}</CTableDataCell>
                         <CTableDataCell>
                           <div className="d-flex gap-1">
@@ -226,7 +221,7 @@ const Inventory = () => {
                     ))
                   ) : (
                     <CTableRow>
-                      <CTableDataCell colSpan="8" className="text-center">
+                      <CTableDataCell colSpan="7" className="text-center">
                         Tidak ada data inventaris yang tersedia
                       </CTableDataCell>
                     </CTableRow>

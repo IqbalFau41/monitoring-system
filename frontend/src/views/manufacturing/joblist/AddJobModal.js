@@ -105,6 +105,8 @@ export const AddJobModal = ({
           options={[
             { label: 'PENDING', value: 'PENDING' },
             { label: 'IN PROGRESS', value: 'IN PROGRESS' },
+            { label: 'ORDER', value: 'ORDER' },
+            { label: 'PR', value: 'PR' },
             { label: 'COMPLETED', value: 'COMPLETED' },
           ]}
           className="mb-3"

@@ -13,18 +13,16 @@ import {
   CTableRow,
   CTableDataCell,
   CButton,
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
   CFormInput,
   CAlert,
 } from '@coreui/react'
-import axios from 'axios'
-import { cilTrash, cilSearch } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
-import '../../../scss/inventoryConfig.scss'
+import { cilTrash, cilSearch } from '@coreui/icons'
+import axios from 'axios'
+import './JobHistory.scss'
+import { TableHeader } from './TableHeader'
+import { DeleteHistoryModal } from './DeleteHistoryModal'
+import { formatDate } from './JobListUtils'
 
 const JobHistory = () => {
   // State declarations
@@ -37,9 +35,8 @@ const JobHistory = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(50)
   const [deleteItem, setDeleteItem] = useState(null)
-  const [deleting, setDeleting] = useState(false)
 
-  // Data fetching function
+  // Fetch data function
   const fetchJobHistory = async () => {
     setLoading(true)
     try {
@@ -54,58 +51,27 @@ const JobHistory = () => {
     }
   }
 
+  // Fetch data on component mount
   useEffect(() => {
     fetchJobHistory()
   }, [])
 
-  // Sort handling
+  // Handle notifications
+  const showSuccess = (message) => {
+    setSuccessMessage(message)
+    setTimeout(() => {
+      setSuccessMessage(null)
+    }, 3000)
+  }
+
+  // Sort handler
   const handleSort = (column) => {
     const direction = sortOrder.column === column && sortOrder.direction === 'asc' ? 'desc' : 'asc'
     setSortOrder({ column, direction })
   }
 
-  // Delete handling
-  const handleDelete = async () => {
-    if (!deleteItem) return
-
-    setDeleting(true)
-    try {
-      console.log('Deleting item:', deleteItem)
-      const response = await axios.delete(`http://localhost:3001/api/job-history/${deleteItem.NRP}`)
-
-      console.log('Delete response:', response)
-      setSuccessMessage(`Riwayat pekerjaan ${deleteItem.NAME} berhasil dihapus`)
-      fetchJobHistory()
-      setDeleteItem(null)
-
-      setTimeout(() => {
-        setSuccessMessage(null)
-      }, 3000)
-    } catch (error) {
-      console.error('Full error:', error)
-      console.error('Error details:', error.response?.data)
-
-      setError(
-        `Gagal menghapus riwayat pekerjaan: ${error.response?.data?.error || error.message}. Silakan coba lagi nanti.`,
-      )
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  // Format date for display
-  const formatDate = (date) => {
-    if (!date) return '-'
-    return new Date(date).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
-  }
-
   // Data processing logic
   const sortedAndFilteredHistory = React.useMemo(() => {
-    // First, filter the jobs based on search term
     const filtered = jobHistory.filter((item) =>
       Object.values(item).some(
         (value) =>
@@ -115,7 +81,6 @@ const JobHistory = () => {
       ),
     )
 
-    // Then sort the filtered results
     return [...filtered].sort((a, b) => {
       const aValue = a[sortOrder.column] || ''
       const bValue = b[sortOrder.column] || ''
@@ -139,6 +104,11 @@ const JobHistory = () => {
     setCurrentPage(pageNumber)
   }
 
+  // Handle delete
+  const handleDelete = (job) => {
+    setDeleteItem(job)
+  }
+
   // Loading spinner display
   if (loading) {
     return (
@@ -148,19 +118,9 @@ const JobHistory = () => {
     )
   }
 
-  // Table header component for better organization
-  const TableHeader = ({ column, children }) => (
-    <div className="fixed-header-cell" onClick={() => handleSort(column)}>
-      {children}
-      {sortOrder.column === column && (
-        <span className="ms-1">{sortOrder.direction === 'asc' ? '↑' : '↓'}</span>
-      )}
-    </div>
-  )
-
   // Main component render
   return (
-    <CRow className="job-history-list-page">
+    <CRow className="job-history-page">
       <CCol xs={12}>
         {error && (
           <CAlert color="danger" dismissible onClose={() => setError(null)}>
@@ -174,8 +134,8 @@ const JobHistory = () => {
         )}
 
         <CCard className="mb-4">
-          <CCardHeader className="d-flex justify-content-between align-items-center">
-            <strong>Riwayat Pekerjaan</strong>
+          <CCardHeader className="d-flex justify-content-between align-items-center flex-wrap">
+            <strong>Riwayat Pekerjaan Karyawan</strong>
             <div className="search-container">
               <CFormInput
                 type="text"
@@ -187,17 +147,37 @@ const JobHistory = () => {
               />
             </div>
           </CCardHeader>
+
           <CCardBody>
             <div className="fixed-header">
-              <TableHeader column="NRP">NRP</TableHeader>
-              <TableHeader column="NAME">Nama</TableHeader>
-              <TableHeader column="JOB_CLASS">Job Class</TableHeader>
-              <TableHeader column="JOB_DESC">Deskripsi Pekerjaan</TableHeader>
-              <TableHeader column="FACTORY">Lokasi</TableHeader>
-              <TableHeader column="DUE_DATE">Tenggat</TableHeader>
-              <TableHeader column="STATUS">Status</TableHeader>
-              <TableHeader column="COMPLETION_DATE">Tanggal Selesai</TableHeader>
-              <TableHeader column="ORIGINAL_CREATED_AT">Tanggal Dibuat</TableHeader>
+              <TableHeader column="NRP" sortOrder={sortOrder} handleSort={handleSort}>
+                NRP
+              </TableHeader>
+              <TableHeader column="NAME" sortOrder={sortOrder} handleSort={handleSort}>
+                Nama
+              </TableHeader>
+              <TableHeader column="JOB_CLASS" sortOrder={sortOrder} handleSort={handleSort}>
+                Job Class
+              </TableHeader>
+              <TableHeader column="JOB_DESC" sortOrder={sortOrder} handleSort={handleSort}>
+                Deskripsi Pekerjaan
+              </TableHeader>
+              <TableHeader column="FACTORY" sortOrder={sortOrder} handleSort={handleSort}>
+                Lokasi
+              </TableHeader>
+              <TableHeader column="STATUS" sortOrder={sortOrder} handleSort={handleSort}>
+                Status
+              </TableHeader>
+              <TableHeader
+                column="ORIGINAL_CREATED_AT"
+                sortOrder={sortOrder}
+                handleSort={handleSort}
+              >
+                Tanggal Dibuat
+              </TableHeader>
+              <TableHeader column="COMPLETION_DATE" sortOrder={sortOrder} handleSort={handleSort}>
+                Tanggal Selesai
+              </TableHeader>
               <div className="fixed-header-cell">Aksi</div>
             </div>
 
@@ -212,29 +192,30 @@ const JobHistory = () => {
                         <CTableDataCell>{job.JOB_CLASS}</CTableDataCell>
                         <CTableDataCell>{job.JOB_DESC}</CTableDataCell>
                         <CTableDataCell>{job.FACTORY}</CTableDataCell>
-                        <CTableDataCell>{formatDate(job.DUE_DATE)}</CTableDataCell>
                         <CTableDataCell>
                           <span className={`status-badge status-${job.STATUS?.toLowerCase()}`}>
                             {job.STATUS || 'N/A'}
                           </span>
                         </CTableDataCell>
-                        <CTableDataCell>{formatDate(job.COMPLETION_DATE)}</CTableDataCell>
                         <CTableDataCell>{formatDate(job.ORIGINAL_CREATED_AT)}</CTableDataCell>
+                        <CTableDataCell>{formatDate(job.COMPLETION_DATE)}</CTableDataCell>
                         <CTableDataCell>
-                          <CButton
-                            color="danger"
-                            size="sm"
-                            onClick={() => setDeleteItem(job)}
-                            title="Hapus"
-                          >
-                            <CIcon icon={cilTrash} />
-                          </CButton>
+                          <div className="d-flex gap-1">
+                            <CButton
+                              color="danger"
+                              size="sm"
+                              onClick={() => handleDelete(job)}
+                              title="Hapus"
+                            >
+                              <CIcon icon={cilTrash} />
+                            </CButton>
+                          </div>
                         </CTableDataCell>
                       </CTableRow>
                     ))
                   ) : (
                     <CTableRow>
-                      <CTableDataCell colSpan="10" className="text-center">
+                      <CTableDataCell colSpan="9" className="text-center">
                         Tidak ada data riwayat pekerjaan yang tersedia
                       </CTableDataCell>
                     </CTableRow>
@@ -271,36 +252,14 @@ const JobHistory = () => {
           </CCardBody>
         </CCard>
 
-        {/* Delete confirmation modal */}
-        <CModal visible={!!deleteItem} onClose={() => setDeleteItem(null)}>
-          <CModalHeader>
-            <CModalTitle>Konfirmasi Hapus</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            Apakah Anda yakin ingin menghapus riwayat pekerjaan:
-            <br />
-            <strong>NRP: {deleteItem?.NRP}</strong>
-            <br />
-            <strong>Nama: {deleteItem?.NAME}</strong>
-            <br />
-            <strong>Deskripsi Pekerjaan: {deleteItem?.JOB_DESC}</strong>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => setDeleteItem(null)}>
-              Batal
-            </CButton>
-            <CButton color="danger" onClick={handleDelete} disabled={deleting}>
-              {deleting ? (
-                <>
-                  <CSpinner size="sm" color="light" className="me-1" />
-                  Memproses...
-                </>
-              ) : (
-                'Hapus'
-              )}
-            </CButton>
-          </CModalFooter>
-        </CModal>
+        {/* Modal Components */}
+        <DeleteHistoryModal
+          deleteItem={deleteItem}
+          setDeleteItem={setDeleteItem}
+          fetchJobHistory={fetchJobHistory}
+          showSuccess={showSuccess}
+          setError={setError}
+        />
       </CCol>
     </CRow>
   )

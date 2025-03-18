@@ -4,18 +4,13 @@ const sql = require("mssql");
 // Function to create a new inventory item
 const createInventoryItem = async (data) => {
   const {
+    no_part,
     name_part,
     type_part,
     maker_part,
     qty_part,
+    location_part,
     information_part,
-    // Additional fields that might be required by the database
-    date_part,
-    delivery_note,
-    purchase_order,
-    unit_part,
-    recipient_part,
-    pic_part,
   } = data;
 
   // Basic validation
@@ -24,33 +19,23 @@ const createInventoryItem = async (data) => {
   }
 
   try {
-    const currentDate = new Date().toISOString().split("T")[0];
-
     await sql.query`
       INSERT INTO INVENTORY_PARTS (
-        date_part, 
-        delivery_note, 
-        purchase_order, 
+        no_part,
         name_part, 
         type_part, 
         maker_part, 
-        qty_part, 
-        unit_part, 
-        recipient_part, 
-        information_part, 
-        pic_part
+        qty_part,
+        location_part, 
+        information_part
       ) VALUES (
-        ${date_part || currentDate}, 
-        ${delivery_note || null}, 
-        ${purchase_order || null}, 
+        ${no_part},
         ${name_part}, 
         ${type_part || null}, 
         ${maker_part || null}, 
-        ${qty_part}, 
-        ${unit_part || null}, 
-        ${recipient_part || null}, 
-        ${information_part || null}, 
-        ${pic_part || null}
+        ${qty_part},
+        ${location_part || null}, 
+        ${information_part || null}
       )`;
     return { message: "Item created successfully" };
   } catch (error) {
@@ -68,7 +53,8 @@ const getInventoryItems = async () => {
         name_part, 
         type_part, 
         maker_part, 
-        qty_part, 
+        qty_part,
+        location_part, 
         information_part 
       FROM INVENTORY_PARTS
       ORDER BY no_part DESC
@@ -89,7 +75,8 @@ const getInventoryItemById = async (id) => {
         name_part, 
         type_part, 
         maker_part, 
-        qty_part, 
+        qty_part,
+        location_part, 
         information_part 
       FROM INVENTORY_PARTS 
       WHERE no_part = ${id}
@@ -113,14 +100,8 @@ const updateInventoryItem = async (id, data) => {
     type_part,
     maker_part,
     qty_part,
+    location_part,
     information_part,
-    // Additional fields
-    date_part,
-    delivery_note,
-    purchase_order,
-    unit_part,
-    recipient_part,
-    pic_part,
   } = data;
 
   // Validate input
@@ -138,22 +119,15 @@ const updateInventoryItem = async (id, data) => {
       throw new Error("Item not found");
     }
 
-    const currentDate = new Date().toISOString().split("T")[0];
-
     await sql.query`
       UPDATE INVENTORY_PARTS 
       SET 
-        date_part = ${date_part || currentDate}, 
-        delivery_note = ${delivery_note || null}, 
-        purchase_order = ${purchase_order || null}, 
         name_part = ${name_part}, 
         type_part = ${type_part || null}, 
         maker_part = ${maker_part || null}, 
-        qty_part = ${qty_part}, 
-        unit_part = ${unit_part || null}, 
-        recipient_part = ${recipient_part || null}, 
-        information_part = ${information_part || null}, 
-        pic_part = ${pic_part || null}
+        qty_part = ${qty_part},
+        location_part = ${location_part || null}, 
+        information_part = ${information_part || null}
       WHERE no_part = ${id}
     `;
     return { message: "Item updated successfully" };
