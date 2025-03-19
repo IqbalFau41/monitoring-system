@@ -1,5 +1,5 @@
 // src/views/pages/login/Login.js
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import {
@@ -21,28 +21,51 @@ import { cilLockLocked, cilUser } from '@coreui/icons'
 const Login = () => {
   const [data, setData] = useState({ nrp: '', email: '' })
   const [error, setError] = useState('')
-  const navigate = useNavigate() // Hook to programmatically navigate
+  const [apiUrl, setApiUrl] = useState('')
+  const navigate = useNavigate()
+
+  // Dynamically determine the API URL based on the current environment
+  useEffect(() => {
+    // Get the hostname and port from the current URL
+    const hostname = window.location.hostname
+    const port = import.meta.env.VITE_BACKEND_PORT || '3001'
+
+    // Determine protocol (use HTTPS in production)
+    const protocol = window.location.protocol
+
+    // For development local environment
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      setApiUrl(`http://localhost:${port}/api/auth/login`)
+    }
+    // For production or other environments
+    else {
+      setApiUrl(`${protocol}//${hostname}:${port}/api/auth/login`)
+    }
+  }, [])
 
   const handleChange = ({ currentTarget: input }) => {
     setData({ ...data, [input.name]: input.value })
   }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const url = 'http://localhost:3001/api/auth/login' // Ganti dengan IP backend Anda
-      const response = await axios.post(url, data)
+      const response = await axios.post(apiUrl, data)
 
-      // Pastikan backend mengembalikan token
-      const { token } = response.data // Sesuaikan dengan struktur respons backend
-      localStorage.setItem('token', token) // Simpan token di local storage
+      // Store the token in local storage
+      const { token } = response.data
+      localStorage.setItem('token', token)
 
-      // Redirect ke cikarang
-      navigate('/cikarang') // Ganti dengan route cikarang Anda
+      // Save the API base URL for other components to use
+      localStorage.setItem('apiBaseUrl', apiUrl.replace('/api/auth/login', ''))
+
+      // Redirect to dashboard
+      navigate('/cikarang')
     } catch (error) {
       if (error.response && error.response.status >= 400 && error.response.status <= 500) {
-        setError(error.response.data.message) // Set pesan kesalahan dari respons
+        setError(error.response.data.message)
       } else {
-        setError('An unexpected error occurred.') // Pesan kesalahan umum
+        setError('An unexpected error occurred. Please check your network connection.')
       }
     }
   }
@@ -76,7 +99,7 @@ const Login = () => {
                         <CIcon icon={cilLockLocked} />
                       </CInputGroupText>
                       <CFormInput
-                        type="Password"
+                        type="password"
                         placeholder="Password"
                         name="nrp"
                         onChange={handleChange}
@@ -84,8 +107,7 @@ const Login = () => {
                         required
                       />
                     </CInputGroup>
-                    {error && <div className="text-danger">{error}</div>}{' '}
-                    {/* Display error message */}
+                    {error && <div className="text-danger mb-3">{error}</div>}
                     <CRow>
                       <CCol xs={6}>
                         <CButton type="submit" color="primary" className="px-4">
