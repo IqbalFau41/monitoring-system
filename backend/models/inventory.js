@@ -4,12 +4,12 @@ const sql = require("mssql");
 // Function to create a new inventory item
 const createInventoryItem = async (data) => {
   const {
-    no_part,
     name_part,
     type_part,
     maker_part,
     qty_part,
     location_part,
+    factory_part,
     information_part,
   } = data;
 
@@ -21,20 +21,20 @@ const createInventoryItem = async (data) => {
   try {
     await sql.query`
       INSERT INTO INVENTORY_PARTS (
-        no_part,
         name_part, 
         type_part, 
         maker_part, 
         qty_part,
         location_part, 
+        factory_part,
         information_part
       ) VALUES (
-        ${no_part},
         ${name_part}, 
         ${type_part || null}, 
         ${maker_part || null}, 
         ${qty_part},
         ${location_part || null}, 
+        ${factory_part || null}, 
         ${information_part || null}
       )`;
     return { message: "Item created successfully" };
@@ -55,6 +55,7 @@ const getInventoryItems = async () => {
         maker_part, 
         qty_part,
         location_part, 
+        factory_part,
         information_part 
       FROM INVENTORY_PARTS
       ORDER BY no_part DESC
@@ -77,6 +78,7 @@ const getInventoryItemById = async (id) => {
         maker_part, 
         qty_part,
         location_part, 
+        factory_part,
         information_part 
       FROM INVENTORY_PARTS 
       WHERE no_part = ${id}
@@ -101,6 +103,7 @@ const updateInventoryItem = async (id, data) => {
     maker_part,
     qty_part,
     location_part,
+    factory_part,
     information_part,
   } = data;
 
@@ -127,6 +130,7 @@ const updateInventoryItem = async (id, data) => {
         maker_part = ${maker_part || null}, 
         qty_part = ${qty_part},
         location_part = ${location_part || null}, 
+        factory_part = ${factory_part || null}, 
         information_part = ${information_part || null}
       WHERE no_part = ${id}
     `;

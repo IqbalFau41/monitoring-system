@@ -45,6 +45,7 @@ const Inventory = () => {
     maker_part: '',
     qty_part: '',
     location_part: '',
+    factory_part: '',
     information_part: '',
   })
 
@@ -183,6 +184,9 @@ const Inventory = () => {
               <TableHeader column="location_part" sortOrder={sortOrder} handleSort={handleSort}>
                 Lokasi
               </TableHeader>
+              <TableHeader column="factory_part" sortOrder={sortOrder} handleSort={handleSort}>
+                Factory
+              </TableHeader>
               <TableHeader column="information_part" sortOrder={sortOrder} handleSort={handleSort}>
                 Informasi
               </TableHeader>
@@ -201,6 +205,7 @@ const Inventory = () => {
                         <CTableDataCell>{inventory.maker_part || '-'}</CTableDataCell>
                         <CTableDataCell>{inventory.qty_part}</CTableDataCell>
                         <CTableDataCell>{inventory.location_part || '-'}</CTableDataCell>
+                        <CTableDataCell>{inventory.factory_part || '-'}</CTableDataCell>
                         <CTableDataCell>{inventory.information_part || '-'}</CTableDataCell>
                         <CTableDataCell>
                           <div className="d-flex gap-1">

@@ -25,16 +25,23 @@ export const AddInventoryModal = ({
   const handleAddInventory = async () => {
     setAddingInventory(true)
     try {
-      await axios.post('http://localhost:3001/api/inventory', newInventory)
+      // Create a copy of the inventory data without the no_part field
+      const inventoryData = { ...newInventory }
+      // If no_part exists in the object, delete it to prevent SQL Server identity insert error
+      if ('no_part' in inventoryData) {
+        delete inventoryData.no_part
+      }
+
+      await axios.post('http://localhost:3001/api/inventory', inventoryData)
       showSuccess(`Inventaris baru ${newInventory.name_part} berhasil ditambahkan`)
       onClose()
       setNewInventory({
-        no_part: '',
         name_part: '',
         type_part: '',
         maker_part: '',
         qty_part: '',
         location_part: '',
+        factory_part: '',
         information_part: '',
       })
       fetchInventories()
@@ -54,13 +61,6 @@ export const AddInventoryModal = ({
         <CModalTitle>Tambah Inventaris Baru</CModalTitle>
       </CModalHeader>
       <CModalBody>
-        <CFormInput
-          label="ID"
-          value={newInventory.no_part}
-          onChange={(e) => setNewInventory({ ...newInventory, no_part: e.target.value })}
-          className="mb-3"
-          required
-        />
         <CFormInput
           label="Nama Part"
           value={newInventory.name_part}
@@ -94,6 +94,13 @@ export const AddInventoryModal = ({
           label="Lokasi"
           value={newInventory.location_part}
           onChange={(e) => setNewInventory({ ...newInventory, location_part: e.target.value })}
+          className="mb-3"
+          required
+        />
+        <CFormInput
+          label="Factory"
+          value={newInventory.factory_part}
+          onChange={(e) => setNewInventory({ ...newInventory, factory_part: e.target.value })}
           className="mb-3"
           required
         />

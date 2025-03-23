@@ -34,6 +34,7 @@ router.get("/", async (req, res) => {
         maker_part, 
         qty_part,
         location_part, 
+        factory_part,
         information_part 
       FROM INVENTORY_PARTS
       ORDER BY no_part DESC
@@ -76,6 +77,7 @@ router.get("/:id", async (req, res) => {
         maker_part, 
         qty_part,
         location_part, 
+        factory_part,
         information_part 
       FROM INVENTORY_PARTS 
       WHERE no_part = @id
@@ -106,31 +108,31 @@ router.post("/", validateBody, async (req, res) => {
 
     const request = deptMfg.request();
 
-    // Fields matching frontend
-    request.input("no_part", req.body.no_part);
+    // Fields matching frontend - REMOVE no_part
     request.input("name_part", req.body.name_part);
     request.input("type_part", req.body.type_part || null);
     request.input("maker_part", req.body.maker_part || null);
     request.input("qty_part", req.body.qty_part);
     request.input("location_part", req.body.location_part || null);
+    request.input("factory_part", req.body.factory_part || null);
     request.input("information_part", req.body.information_part || null);
 
     await request.query(`
       INSERT INTO INVENTORY_PARTS (
-        no_part,
         name_part, 
         type_part, 
         maker_part, 
         qty_part,
         location_part, 
+        factory_part, 
         information_part
       ) VALUES (
-        @no_part,
         @name_part, 
         @type_part, 
         @maker_part, 
         @qty_part,
         @location_part, 
+        @factory_part, 
         @information_part
       )
     `);
@@ -182,6 +184,7 @@ router.put("/:id", validateBody, async (req, res) => {
     updateRequest.input("maker_part", req.body.maker_part || null);
     updateRequest.input("qty_part", req.body.qty_part);
     updateRequest.input("location_part", req.body.location_part || null);
+    updateRequest.input("factory_part", req.body.factory_part || null);
     updateRequest.input("information_part", req.body.information_part || null);
 
     await updateRequest.query(`
@@ -192,6 +195,7 @@ router.put("/:id", validateBody, async (req, res) => {
         maker_part = @maker_part, 
         qty_part = @qty_part,
         location_part = @location_part, 
+        factory_part = @factory_part, 
         information_part = @information_part
       WHERE no_part = @id
     `);

@@ -55,6 +55,7 @@ export const DeleteInventoryModal = ({
         <strong>Kuantitas: {deleteItem?.qty_part}</strong>
         <br />
         <strong>Lokasi: {deleteItem?.location_part || '-'}</strong>
+        <strong>Factory: {deleteItem?.factory_part || '-'}</strong>
       </CModalBody>
       <CModalFooter>
         <CButton color="secondary" onClick={() => setDeleteItem(null)}>

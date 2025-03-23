@@ -40,7 +40,7 @@
       }
       &:nth-child(2) {
         // Nama Part
-        width: 15%;
+        width: 20%;
       }
       &:nth-child(3) {
         // Tipe Part
@@ -59,10 +59,14 @@
         width: 12%;
       }
       &:nth-child(7) {
+        // Factory
+        width: 12%;
+      }
+      &:nth-child(8) {
         // Informasi
         width: 25%;
       }
-      &:nth-child(8) {
+      &:nth-child(9) {
         // Aksi
         width: 10%;
       }
@@ -75,7 +79,7 @@
 
   .table-container {
     position: relative;
-    max-height: 61vh;
+    max-height: 54vh;
     overflow-y: auto;
     width: 100%;
   }
@@ -98,7 +102,7 @@
       }
       &:nth-child(2) {
         // Nama Part
-        width: 15%;
+        width: 20%;
       }
       &:nth-child(3) {
         // Tipe Part
@@ -117,10 +121,14 @@
         width: 12%;
       }
       &:nth-child(7) {
+        // Factory
+        width: 12%;
+      }
+      &:nth-child(8) {
         // Informasi
         width: 25%;
       }
-      &:nth-child(8) {
+      &:nth-child(9) {
         // Aksi
         width: 10%;
       }

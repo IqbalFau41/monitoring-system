@@ -82,6 +82,12 @@ export const UpdateInventoryModal = ({
           className="mb-3"
         />
         <CFormInput
+          label="Factory"
+          value={updateItem?.factory_part || ''}
+          onChange={(e) => setUpdateItem({ ...updateItem, factory_part: e.target.value })}
+          className="mb-3"
+        />
+        <CFormInput
           label="Informasi"
           value={updateItem?.information_part || ''}
           onChange={(e) => setUpdateItem({ ...updateItem, information_part: e.target.value })}
