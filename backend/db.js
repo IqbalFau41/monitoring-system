@@ -2,11 +2,7 @@
 const sql = require("mssql");
 require("dotenv").config();
 
-/**
- * DATABASE 1: IOT_HUB
- * Tables: CODE_MACHINE_PRODUCTION, HISTORY_MACHINE_PRODUCTION,
- * MACHINE_STATUS_PRODUCTION, MachineData
- */
+// Database configurations
 const configDB1 = {
   user: process.env.DB1_USER,
   password: process.env.DB1_PASSWORD,
@@ -16,14 +12,16 @@ const configDB1 = {
   options: {
     encrypt: process.env.DB1_ENCRYPT === "true",
     trustServerCertificate: process.env.DB1_TRUST_CERT === "true",
+    connectTimeout: 30000, // 30 second timeout
+    requestTimeout: 30000, // 30 second timeout for requests
+    pool: {
+      max: 10, // Maximum pool size
+      min: 0, // Minimum pool size
+      idleTimeoutMillis: 30000, // How long a connection can be idle before being removed
+    },
   },
 };
 
-/**
- * DATABASE 2: DEPT_MANUFACTURING
- * Tables: INVENTORY_PARTS, INVENTORY_SPAREPART, USER_JOBLIST,
- * USER_JOBLIST_HISTORY, USER_NAME
- */
 const configDB2 = {
   user: process.env.DB2_USER,
   password: process.env.DB2_PASSWORD,
@@ -33,13 +31,16 @@ const configDB2 = {
   options: {
     encrypt: process.env.DB2_ENCRYPT === "true",
     trustServerCertificate: process.env.DB2_TRUST_CERT === "true",
+    connectTimeout: 30000,
+    requestTimeout: 30000,
+    pool: {
+      max: 10,
+      min: 0,
+      idleTimeoutMillis: 30000,
+    },
   },
 };
 
-/**
- * DATABASE 3: MACHINE_LOG
- * No specific tables identified in the provided code
- */
 const configDB3 = {
   user: process.env.DB3_USER,
   password: process.env.DB3_PASSWORD,
@@ -49,42 +50,91 @@ const configDB3 = {
   options: {
     encrypt: process.env.DB3_ENCRYPT === "true",
     trustServerCertificate: process.env.DB3_TRUST_CERT === "true",
+    connectTimeout: 30000,
+    requestTimeout: 30000,
+    pool: {
+      max: 10,
+      min: 0,
+      idleTimeoutMillis: 30000,
+    },
   },
 };
 
-// Fungsi untuk menghubungkan ke semua database
+// Connect to all databases with better error handling
 const connectDatabases = async () => {
-  try {
-    // Koneksi ke Database 1 (IOT_HUB)
-    const poolDB1 = await new sql.ConnectionPool(configDB1).connect();
-    console.log(`Connected to ${process.env.DB1_DATABASE} Database (IOT_HUB)`);
+  const connections = {};
+  let connectedDbs = 0;
 
-    // Koneksi ke Database 2 (DEPT_MANUFACTURING)
-    const poolDB2 = await new sql.ConnectionPool(configDB2).connect();
+  try {
+    // Connect to Database 1 (IOT_HUB)
+    connections.iotHub = await new sql.ConnectionPool(configDB1).connect();
+    console.log(`Connected to ${process.env.DB1_DATABASE} Database (IOT_HUB)`);
+    connectedDbs++;
+
+    // Connect to Database 2 (DEPT_MANUFACTURING)
+    connections.deptMfg = await new sql.ConnectionPool(configDB2).connect();
     console.log(
       `Connected to ${process.env.DB2_DATABASE} Database (DEPT_MANUFACTURING)`
     );
+    connectedDbs++;
 
-    // Koneksi ke Database 3 (MACHINE_LOG)
-    const poolDB3 = await new sql.ConnectionPool(configDB3).connect();
+    // Connect to Database 3 (MACHINE_LOG)
+    connections.plcData = await new sql.ConnectionPool(configDB3).connect();
     console.log(
       `Connected to ${process.env.DB3_DATABASE} Database (MACHINE_LOG)`
     );
+    connectedDbs++;
 
-    // Mengembalikan objek koneksi database
-    return {
-      iotHub: poolDB1, // DB1: IOT_HUB
-      deptMfg: poolDB2, // DB2: DEPT_MANUFACTURING
-      plcData: poolDB3, // DB3: MACHINE_LOG
-    };
+    // Return all connections
+    return connections;
   } catch (error) {
     console.error("Error connecting to SQL Servers:", error.message);
+    // Log which databases connected successfully before the error
+    console.error(
+      `Successfully connected to ${connectedDbs} out of 3 databases`
+    );
+
+    // Close any open connections before throwing the error
+    for (const key in connections) {
+      if (connections[key] && typeof connections[key].close === "function") {
+        try {
+          await connections[key].close();
+          console.log(`Closed connection to ${key} database`);
+        } catch (closeError) {
+          console.error(
+            `Error closing ${key} database connection:`,
+            closeError.message
+          );
+        }
+      }
+    }
+
     throw error;
+  }
+};
+
+// Add a function to close all database connections
+const closeDatabases = async (databases) => {
+  if (!databases) return;
+
+  for (const key in databases) {
+    if (databases[key] && typeof databases[key].close === "function") {
+      try {
+        await databases[key].close();
+        console.log(`Closed connection to ${key} database`);
+      } catch (error) {
+        console.error(
+          `Error closing ${key} database connection:`,
+          error.message
+        );
+      }
+    }
   }
 };
 
 module.exports = {
   connectDatabases,
+  closeDatabases,
   configDB1,
   configDB2,
   configDB3,

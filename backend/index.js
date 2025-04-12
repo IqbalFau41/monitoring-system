@@ -3,106 +3,223 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
-const { connectDatabases } = require("./db");
+const { connectDatabases, closeDatabases } = require("./db");
 const setupWebSocketServer = require("./websockets");
+const helmet = require("helmet"); // Add security headers
+const compression = require("compression"); // Add response compression
 
 const app = express();
 
-// Middleware
-app.use(express.json());
+// Enhanced security middleware
+app.use(helmet());
 
-// Explicit CORS configuration
+// Compress responses
+app.use(compression());
+
+// Request size limits
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// CORS configuration
 app.use(
   cors({
-    origin: "*", // Allow all origins
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: process.env.CORS_ORIGIN || "*",
+    methods: (process.env.CORS_METHODS || "GET,POST,PUT,DELETE").split(","),
+    allowedHeaders: (
+      process.env.CORS_HEADERS || "Content-Type,Authorization"
+    ).split(","),
     credentials: true,
   })
 );
 
-// Fungsi async untuk inisialisasi server
-const startServer = async () => {
-  try {
-    // Sambungkan ke semua database
-    const databases = await connectDatabases();
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    status: "error",
+    message: "An unexpected error occurred",
+    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+});
 
-    // Tambahkan database ke global untuk diakses di seluruh aplikasi
+// Async server initialization
+const startServer = async () => {
+  let databases = null;
+  let server = null;
+  let wsServer = null;
+
+  try {
+    // Connect to all databases
+    databases = await connectDatabases();
     global.databases = databases;
 
-    // Prefix API
+    // API routes prefix
     const apiPrefix = process.env.API_PREFIX || "/api";
 
-    // Route untuk masing-masing database
-    // const userRouter = require("./routes/users"); // Menggunakan DB1 (IOT_HUB)
-
+    // Register routes
     // Routes using DEPT_MANUFACTURING (DB2)
-    const inventoryRouter = require("./routes/inventory"); // DB2: DEPT_MANUFACTURING - INVENTORY_PARTS
-    const authRouter = require("./routes/auth"); // DB2: DEPT_MANUFACTURING - USER_NAME
-    const jobListRouter = require("./routes/joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST
-    const historyJobListRouter = require("./routes/history_joblist"); // DB2: DEPT_MANUFACTURING - USER_JOBLIST_HISTORY
+    const inventoryRouter = require("./routes/inventory");
+    const authRouter = require("./routes/auth");
+    const jobListRouter = require("./routes/joblist");
+    const historyJobListRouter = require("./routes/history_joblist");
+
+    // Routes using IOT_HUB (DB1) and MACHINE_LOG (DB3)
+    const machineNameRouter = require("./routes/machine_name");
+    const machineStatusRouter = require("./routes/machine_status");
+    const machineHistoryRouter = require("./routes/machine_history");
     const machineDetailRouter = require("./routes/machine_detail");
 
-    // Routes using IOT_HUB (DB1)
-    const machineNameRouter = require("./routes/machine_name"); // DB1: IOT_HUB - CODE_MACHINE_PRODUCTION
-    const machineStatusRouter = require("./routes/machine_status"); // DB1: IOT_HUB - CODE_MACHINE_PRODUCTION
-    const machineHistoryRouter = require("./routes/machine_history"); // DB1: IOT_HUB - MACHINE_STATUS_PRODUCTION, CODE_MACHINE_PRODUCTION
-
-    // Register routes for DEPT_MANUFACTURING (DB2)
+    // Apply routes
     app.use(`${apiPrefix}/inventory`, inventoryRouter);
     app.use(`${apiPrefix}/auth`, authRouter);
     app.use(`${apiPrefix}/job-list`, jobListRouter);
     app.use(`${apiPrefix}/job-history`, historyJobListRouter);
-
-    // Register routes for IOT_HUB (DB1)
     app.use(`${apiPrefix}/machine-names`, machineNameRouter);
     app.use(`${apiPrefix}/machine-status`, machineStatusRouter);
     app.use(`${apiPrefix}/machine-history`, machineHistoryRouter);
     app.use(`${apiPrefix}/machine-detail`, machineDetailRouter);
 
-    // Health check endpoint
-    app.get(`${apiPrefix}/health`, (req, res) => {
-      res.status(200).json({
-        status: "ok",
-        message: "Server is running",
-        databases: {
-          db1: process.env.DB1_DATABASE, // IOT_HUB
-          db2: process.env.DB2_DATABASE, // DEPT_MANUFACTURING
-          db3: process.env.DB3_DATABASE, // MACHINE_LOG
-        },
+    // Health check endpoint with database connectivity check
+    app.get(`${apiPrefix}/health`, async (req, res) => {
+      try {
+        // Simple query to check DB connections
+        await global.databases.iotHub.request().query("SELECT 1 as connected");
+        await global.databases.deptMfg.request().query("SELECT 1 as connected");
+        await global.databases.plcData.request().query("SELECT 1 as connected");
+
+        res.status(200).json({
+          status: "ok",
+          message: "Server is running",
+          databases: {
+            db1: {
+              name: process.env.DB1_DATABASE,
+              status: "connected",
+            },
+            db2: {
+              name: process.env.DB2_DATABASE,
+              status: "connected",
+            },
+            db3: {
+              name: process.env.DB3_DATABASE,
+              status: "connected",
+            },
+          },
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: "error",
+          message: "Server is running but database connection issues detected",
+          error: error.message,
+        });
+      }
+    });
+
+    // 404 handler for undefined routes
+    app.use((req, res) => {
+      res.status(404).json({
+        status: "error",
+        message: "Endpoint not found",
       });
     });
 
-    const port = process.env.PORT || 3001;
+    // Server configuration
+    const port = parseInt(process.env.PORT) || 3001;
     const host = process.env.HOST || "0.0.0.0";
 
-    // Create HTTP server
-    const server = http.createServer(app);
+    // Create and start HTTP server
+    server = http.createServer(app);
+    wsServer = setupWebSocketServer(server);
 
-    // Setup WebSocket server
-    const wsServer = setupWebSocketServer(server);
-
-    // Start HTTP server (which also handles WebSockets)
-    server.listen(port, host, () =>
+    server.listen(port, host, () => {
       console.log(
         `Server running on http://${host}:${port} with WebSocket support`
-      )
-    );
-
-    // Handle graceful shutdown
-    process.on("SIGTERM", () => {
-      console.log("SIGTERM signal received: closing HTTP server");
-      wsServer.close();
-      server.close(() => {
-        console.log("HTTP server closed");
-        process.exit(0);
-      });
+      );
     });
+
+    // Graceful shutdown handlers
+    setupGracefulShutdown(server, wsServer, databases);
   } catch (error) {
     console.error("Failed to start server:", error);
+
+    // Clean up resources if startup fails
+    if (wsServer) {
+      wsServer.close();
+    }
+
+    if (server) {
+      server.close();
+    }
+
+    if (databases) {
+      await closeDatabases(databases);
+    }
+
     process.exit(1);
   }
 };
 
-// Jalankan server
+// Handle graceful shutdowns
+function setupGracefulShutdown(server, wsServer, databases) {
+  // SIGTERM handler (e.g., for docker containers)
+  process.on("SIGTERM", async () => {
+    console.log("SIGTERM signal received: closing servers");
+    await performGracefulShutdown(server, wsServer, databases);
+  });
+
+  // SIGINT handler (e.g., Ctrl+C)
+  process.on("SIGINT", async () => {
+    console.log("SIGINT signal received: closing servers");
+    await performGracefulShutdown(server, wsServer, databases);
+  });
+
+  // Uncaught exception handler
+  process.on("uncaughtException", async (error) => {
+    console.error("Uncaught exception:", error);
+    await performGracefulShutdown(server, wsServer, databases);
+  });
+
+  // Unhandled rejection handler (for promises)
+  process.on("unhandledRejection", async (reason) => {
+    console.error("Unhandled promise rejection:", reason);
+    await performGracefulShutdown(server, wsServer, databases);
+  });
+}
+
+// Perform graceful shutdown
+async function performGracefulShutdown(server, wsServer, databases) {
+  try {
+    // Close WebSocket server first
+    if (wsServer) {
+      await new Promise((resolve) => {
+        wsServer.close(() => {
+          console.log("WebSocket server closed");
+          resolve();
+        });
+      });
+    }
+
+    // Then close HTTP server
+    if (server) {
+      await new Promise((resolve) => {
+        server.close(() => {
+          console.log("HTTP server closed");
+          resolve();
+        });
+      });
+    }
+
+    // Finally close database connections
+    if (databases) {
+      await closeDatabases(databases);
+    }
+
+    console.log("Graceful shutdown completed");
+    process.exit(0);
+  } catch (error) {
+    console.error("Error during graceful shutdown:", error);
+    process.exit(1);
+  }
+}
+
+// Start the server
 startServer();
